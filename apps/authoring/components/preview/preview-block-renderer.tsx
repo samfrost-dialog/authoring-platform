@@ -10,7 +10,7 @@ type Block = { id: string; lesson_id: string; type: string; position: number; co
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type C = Record<string, any>
 
-type BlockTheme = { primary: string; accent: string; text: string; bg: string; headingFont: string; bodyFont: string }
+type BlockTheme = { primary: string; accent: string; text: string; bg: string; headingFont: string; bodyFont: string; btnRadius?: string }
 
 export default function PreviewBlockRenderer({ block, theme, courseId }: { block: Block; theme?: BlockTheme; courseId?: string }) {
   const t = theme ?? { primary: '#4F46E5', accent: '#06B6D4', text: '#111827', bg: '#FFFFFF', headingFont: 'Inter', bodyFont: 'Inter' }
@@ -30,33 +30,47 @@ function BlockContent({ block, c, t, courseId }: { block: Block; c: C; t: BlockT
 
     case 'text':
       if (!c.html) return null
-      return <div className="prose prose-gray max-w-none text-gray-800" dangerouslySetInnerHTML={{ __html: c.html }} />
+      return (
+        <div
+          className="prose max-w-none leading-relaxed"
+          style={{ color: t.text, fontFamily: `'${t.bodyFont}', sans-serif` }}
+          dangerouslySetInnerHTML={{ __html: c.html }}
+        />
+      )
 
-    case 'image':
-      if (!c.publicUrl) return (
+    case 'image': {
+      const imgUrl = c.publicUrl || c.src
+      if (!imgUrl) return (
         <div className="h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-sm">No image</div>
       )
+      const caption = c.caption ? String(c.caption).replace(/<[^>]*>/g, '') : ''
       return (
         <figure className={`${c.alignment === 'center' ? 'mx-auto text-center' : c.alignment === 'right' ? 'ml-auto' : ''} ${
-          c.size === 'small' ? 'max-w-xs' : c.size === 'medium' ? 'max-w-md' : c.size === 'full' ? 'w-full' : 'max-w-2xl'
+          c.size === 'small' ? 'max-w-xs' : c.size === 'medium' ? 'max-w-md' : c.size === 'full' ? 'w-full' : 'max-w-3xl'
         }`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={c.publicUrl} alt={c.alt || ''} className="rounded-lg w-full" />
-          {c.caption && <figcaption className="text-sm text-gray-500 mt-2">{c.caption}</figcaption>}
+          <img src={String(imgUrl)} alt={String(c.alt || '')} className="rounded-xl w-full shadow-sm" />
+          {caption && <figcaption className="text-sm mt-2 text-center" style={{ color: `${t.text}60` }}>{caption}</figcaption>}
+          {c.caption && typeof c.caption === 'string' && c.caption.includes('<') && (
+            <div className="prose prose-sm max-w-none mt-2 text-center" dangerouslySetInnerHTML={{ __html: c.caption }} />
+          )}
         </figure>
       )
+    }
 
-    case 'video':
-      if (!c.publicUrl && !c.src) return (
+    case 'video': {
+      const vidUrl = c.publicUrl || c.src
+      if (!vidUrl) return (
         <div className="h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-sm">No video</div>
       )
       if (c.type === 'youtube' || c.type === 'vimeo') {
         const src = c.type === 'youtube'
-          ? c.src.replace('watch?v=', 'embed/')
-          : c.src.replace('vimeo.com/', 'player.vimeo.com/video/')
-        return <div className="aspect-video rounded-lg overflow-hidden"><iframe src={src} className="w-full h-full" allowFullScreen /></div>
+          ? String(vidUrl).replace('watch?v=', 'embed/')
+          : String(vidUrl).replace('vimeo.com/', 'player.vimeo.com/video/')
+        return <div className="aspect-video rounded-xl overflow-hidden shadow-sm"><iframe src={src} className="w-full h-full" allowFullScreen /></div>
       }
-      return <video src={c.publicUrl} controls={c.controls !== false} autoPlay={!!c.autoPlay} className="w-full rounded-lg" />
+      return <video src={String(vidUrl)} controls={c.controls !== false} autoPlay={!!c.autoPlay} className="w-full rounded-xl shadow-sm" />
+    }
 
     case 'audio':
       if (!c.publicUrl) return null

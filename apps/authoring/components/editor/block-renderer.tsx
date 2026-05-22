@@ -52,7 +52,17 @@ function TextBlock({ content }: { content: { html?: string } }) {
   )
 }
 
-function ImageBlock({ content }: { content: { alt?: string; caption?: string } }) {
+function ImageBlock({ content }: { content: { alt?: string; caption?: string; publicUrl?: string; src?: string } }) {
+  const url = content.publicUrl || content.src
+  if (url && !url.startsWith('__import__')) {
+    return (
+      <div className="space-y-1">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={url} alt={content.alt || ''} className="w-full rounded-lg object-cover max-h-64" />
+        {content.caption && <p className="text-[#666] text-xs text-center">{content.caption}</p>}
+      </div>
+    )
+  }
   return (
     <div className="space-y-1">
       <div className="h-32 bg-[#1A1A1C] border border-[#2A2A2E] rounded-lg flex items-center justify-center">
@@ -70,7 +80,23 @@ function ImageBlock({ content }: { content: { alt?: string; caption?: string } }
   )
 }
 
-function VideoBlock({ content }: { content: { src?: string } }) {
+function VideoBlock({ content }: { content: { src?: string; publicUrl?: string; type?: string; controls?: boolean } }) {
+  const url = content.publicUrl || content.src
+  if (url && (content.type === 'youtube' || content.type === 'vimeo')) {
+    const embedSrc = content.type === 'youtube'
+      ? url.replace('watch?v=', 'embed/')
+      : url.replace('vimeo.com/', 'player.vimeo.com/video/')
+    return (
+      <div className="aspect-video rounded-lg overflow-hidden">
+        <iframe src={embedSrc} className="w-full h-full" allowFullScreen />
+      </div>
+    )
+  }
+  if (url && !url.startsWith('__import__')) {
+    return (
+      <video src={url} controls className="w-full rounded-lg max-h-64" />
+    )
+  }
   return (
     <div className="h-32 bg-[#1A1A1C] border border-[#2A2A2E] rounded-lg flex items-center justify-center">
       <div className="text-center">
@@ -79,7 +105,7 @@ function VideoBlock({ content }: { content: { src?: string } }) {
             <path d="M3 2l7 4-7 4V2z" fill="#666"/>
           </svg>
         </div>
-        <p className="text-[#555] text-xs">{content.src ? 'Video added' : 'No video selected'}</p>
+        <p className="text-[#555] text-xs">{url ? 'Video added' : 'No video selected'}</p>
       </div>
     </div>
   )
