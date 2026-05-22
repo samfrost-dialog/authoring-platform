@@ -1,8 +1,7 @@
 /**
  * SCORM 1.2 package importer.
- * Parses an uploaded ZIP, reads imsmanifest.xml, maps HTML content to blocks.
- * Works with Rise exports and other SCORM 1.2 tools.
- * Unrecognised content falls back to raw_html blocks.
+ * Supports Rise Articulate exports (reads embedded base64 JSON course data)
+ * and generic SCORM 1.2 packages (falls back to HTML parsing).
  */
 
 import JSZip from 'jszip'
@@ -12,13 +11,13 @@ export interface ImportedLesson {
   title: string
   position: number
   blocks: ImportedBlock[]
+  mediaFiles: { key: string; data: Buffer; contentType: string }[]
 }
 
 export interface ImportedBlock {
   type: string
   position: number
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  content: Record<string, any>
+  content: Record<string, unknown>
   settings: Record<string, unknown>
   importWarning?: string
 }
@@ -33,313 +32,437 @@ export async function parseScormPackage(zipBuffer: Buffer): Promise<ImportResult
   const zip = await JSZip.loadAsync(zipBuffer)
   const warnings: string[] = []
 
-  // ── Find and parse imsmanifest.xml ────────────────────────────────────────
-  const manifestFile = zip.file('imsmanifest.xml')
-  if (!manifestFile) {
-    throw new Error('No imsmanifest.xml found — this may not be a valid SCORM package.')
+  // ── Try Rise-specific parser first ───────────────────────────────────────
+  const riseResult = await tryParseRise(zip, warnings)
+  if (riseResult) return riseResult
+
+  // ── Fall back to generic SCORM HTML parser ────────────────────────────────
+  return parseGenericScorm(zip, warnings)
+}
+
+// ── Rise parser ───────────────────────────────────────────────────────────────
+
+async function tryParseRise(zip: JSZip, warnings: string[]): Promise<ImportResult | null> {
+  // Rise packages have scormcontent/index.html with base64 JSON embedded
+  const indexFile = zip.file('scormcontent/index.html')
+  if (!indexFile) return null
+
+  const html = await indexFile.async('string')
+
+  // Find the large base64 block containing course JSON
+  const b64Matches = html.match(/[A-Za-z0-9+/]{100,}={0,2}/g)
+  if (!b64Matches) return null
+
+  let courseData: RiseCourseData | null = null
+  for (const b64 of b64Matches) {
+    try {
+      const decoded = Buffer.from(b64, 'base64').toString('utf-8')
+      const parsed = JSON.parse(decoded)
+      if (parsed.course && parsed.course.lessons) {
+        courseData = parsed
+        break
+      }
+    } catch {
+      // Not JSON, try next
+    }
   }
+
+  if (!courseData) return null
+
+  const course = courseData.course
+  const courseTitle = course.title || 'Imported Course'
+  const lessons: ImportedLesson[] = []
+
+  for (let li = 0; li < course.lessons.length; li++) {
+    const lesson = course.lessons[li]
+    const blocks: ImportedBlock[] = []
+    const mediaFiles: { key: string; data: Buffer; contentType: string }[] = []
+    const items = lesson.items || []
+
+    for (let bi = 0; bi < items.length; bi++) {
+      const item = items[bi]
+      const block = await mapRiseItem(item, zip, mediaFiles, warnings)
+      if (block) {
+        block.position = bi
+        blocks.push(block)
+      }
+    }
+
+    lessons.push({
+      title: lesson.title || `Lesson ${li + 1}`,
+      position: li,
+      blocks,
+      mediaFiles,
+    })
+  }
+
+  return { courseTitle, lessons, warnings }
+}
+
+async function mapRiseItem(
+  item: RiseItem,
+  zip: JSZip,
+  mediaFiles: { key: string; data: Buffer; contentType: string }[],
+  warnings: string[]
+): Promise<ImportedBlock | null> {
+  const sub = item.items?.[0] || {}
+  const type = item.type
+  const variant = item.variant || ''
+
+  switch (type) {
+    case 'text': {
+      const heading = sub.heading || ''
+      const paragraph = sub.paragraph || ''
+      const combined = [heading, paragraph].filter(Boolean).join('\n')
+      if (!combined.trim()) return null
+      return {
+        type: 'text',
+        position: 0,
+        content: { html: stripRiseWrappers(combined) },
+        settings: {},
+      }
+    }
+
+    case 'multimedia':
+    case 'image': {
+      const media = sub.media || {}
+      const imageData = media.image
+      const videoData = media.video
+
+      if (videoData) {
+        // Try to extract local video from ZIP
+        const videoKey = decodeURIComponent(videoData.key || '')
+        const localPath = `scormcontent/assets/${videoKey.split('/').pop()}`
+        const videoFile = zip.file(localPath) || findAsset(zip, videoKey)
+
+        if (videoFile) {
+          const uuid = crypto.randomUUID()
+          const ext = videoKey.split('.').pop() || 'mp4'
+          const r2Key = `__import__/${uuid}.${ext}`
+          const data = Buffer.from(await (videoFile as JSZip.JSZipObject).async('arraybuffer'))
+          mediaFiles.push({ key: r2Key, data, contentType: 'video/mp4' })
+          return {
+            type: 'video',
+            position: 0,
+            content: { src: r2Key, type: 'upload', controls: true },
+            settings: {},
+          }
+        }
+
+        // External/transcoded video URL
+        return {
+          type: 'video',
+          position: 0,
+          content: {
+            src: videoData.url || videoData.inputKey || '',
+            type: 'upload',
+            controls: true,
+          },
+          settings: {},
+          importWarning: 'Video was hosted on Rise CDN — re-upload in editor',
+        }
+      }
+
+      if (imageData) {
+        const crushedKey = imageData.crushedKey || ''
+        const localPath = `scormcontent/assets/${decodeURIComponent(crushedKey)}`
+        const imgFile = zip.file(localPath) || findAsset(zip, crushedKey)
+        const caption = sub.caption ? stripRiseWrappers(sub.caption) : ''
+        const paragraph = sub.paragraph ? stripRiseWrappers(sub.paragraph) : ''
+
+        if (imgFile) {
+          const uuid = crypto.randomUUID()
+          const ext = crushedKey.split('.').pop()?.split('?')[0] || 'jpg'
+          const r2Key = `__import__/${uuid}.${ext}`
+          const data = Buffer.from(await (imgFile as JSZip.JSZipObject).async('arraybuffer'))
+          const contentType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg'
+          mediaFiles.push({ key: r2Key, data, contentType })
+
+          const blocks: ImportedBlock[] = [{
+            type: 'image',
+            position: 0,
+            content: { src: r2Key, alt: '', caption, alignment: 'center', size: 'large' },
+            settings: {},
+          }]
+
+          // If there's also text with the image, add a text block
+          if (paragraph) {
+            blocks.push({
+              type: 'text',
+              position: 1,
+              content: { html: paragraph },
+              settings: {},
+            })
+          }
+
+          return blocks.length === 1 ? blocks[0] : {
+            type: 'text',
+            position: 0,
+            content: { html: `<p>${caption}</p>${paragraph}` },
+            settings: {},
+            importWarning: 'Image with text — image extracted separately, see next block',
+          }
+        }
+
+        return {
+          type: 'image',
+          position: 0,
+          content: { src: '', alt: '', caption },
+          settings: {},
+          importWarning: 'Image asset not found in package — re-upload in editor',
+        }
+      }
+
+      return null
+    }
+
+    case 'divider':
+      return { type: 'divider', position: 0, content: { style: 'solid' }, settings: {} }
+
+    case 'quote': {
+      const text = sub.quote || sub.paragraph || sub.heading || ''
+      const author = sub.attribution || sub.author || ''
+      if (!text) return null
+      return {
+        type: 'quote',
+        position: 0,
+        content: { text: stripRiseWrappers(text), author: stripRiseWrappers(author) },
+        settings: {},
+      }
+    }
+
+    case 'accordion': {
+      const subItems = item.items || []
+      const accItems = subItems.map((s: RiseSubItem, i: number) => ({
+        id: s.id || crypto.randomUUID(),
+        title: stripRiseWrappers(s.heading || s.title || `Item ${i + 1}`),
+        bodyHtml: stripRiseWrappers(s.paragraph || s.body || ''),
+      }))
+      return { type: 'accordion', position: 0, content: { items: accItems }, settings: {} }
+    }
+
+    case 'tabs': {
+      const subItems = item.items || []
+      const tabItems = subItems.map((s: RiseSubItem, i: number) => ({
+        id: s.id || crypto.randomUUID(),
+        label: stripRiseWrappers(s.heading || s.title || `Tab ${i + 1}`),
+        bodyHtml: stripRiseWrappers(s.paragraph || s.body || ''),
+      }))
+      return { type: 'tabs', position: 0, content: { items: tabItems }, settings: {} }
+    }
+
+    case 'process':
+    case 'numbered-list': {
+      const subItems = item.items || []
+      const processItems = subItems.map((s: RiseSubItem, i: number) => ({
+        id: s.id || crypto.randomUUID(),
+        title: stripRiseWrappers(s.heading || s.title || `Step ${i + 1}`),
+        bodyHtml: stripRiseWrappers(s.paragraph || s.body || ''),
+      }))
+      return { type: 'process', position: 0, content: { items: processItems }, settings: {} }
+    }
+
+    case 'flashcards': {
+      const subItems = item.items || []
+      const cards = subItems.map((s: RiseSubItem) => ({
+        id: s.id || crypto.randomUUID(),
+        frontHtml: stripRiseWrappers(s.heading || s.front || ''),
+        backHtml: stripRiseWrappers(s.paragraph || s.back || ''),
+      }))
+      return { type: 'flashcards', position: 0, content: { cards }, settings: {} }
+    }
+
+    case 'timeline': {
+      const subItems = item.items || []
+      const timelineItems = subItems.map((s: RiseSubItem, i: number) => ({
+        id: s.id || crypto.randomUUID(),
+        date: s.label || s.date || `${i + 1}`,
+        title: stripRiseWrappers(s.heading || s.title || ''),
+        bodyHtml: stripRiseWrappers(s.paragraph || s.body || ''),
+      }))
+      return { type: 'timeline', position: 0, content: { items: timelineItems }, settings: {} }
+    }
+
+    case 'knowledge-check':
+    case 'quiz': {
+      warnings.push(`Quiz/knowledge check block found — questions must be rebuilt manually in the editor`)
+      return {
+        type: type === 'knowledge-check' ? 'knowledge_check' : 'quiz',
+        position: 0,
+        content: { questions: [], passingScore: 80 },
+        settings: {},
+        importWarning: 'Quiz content cannot be auto-imported — rebuild questions in editor',
+      }
+    }
+
+    case 'button':
+    case 'cta': {
+      const label = sub.label || sub.text || 'Continue'
+      const url = sub.url || '#'
+      return {
+        type: 'button',
+        position: 0,
+        content: { label: stripRiseWrappers(label), url, style: 'primary', alignment: 'center' },
+        settings: {},
+      }
+    }
+
+    case 'statement': {
+      const text = sub.paragraph || sub.heading || sub.text || ''
+      return {
+        type: 'statement',
+        position: 0,
+        content: { text: stripRiseWrappers(text), style: 'standard' },
+        settings: {},
+      }
+    }
+
+    default: {
+      // Try to extract any text content
+      const text = sub.heading || sub.paragraph || sub.body || sub.text || ''
+      if (text) {
+        return {
+          type: 'text',
+          position: 0,
+          content: { html: stripRiseWrappers(text) },
+          settings: {},
+          importWarning: `Rise block type "${type}/${variant}" mapped to text`,
+        }
+      }
+      warnings.push(`Unknown Rise block type "${type}/${variant}" — skipped`)
+      return null
+    }
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function findAsset(zip: JSZip, key: string): any {
+  const decoded = decodeURIComponent(key)
+  const filename = decoded.split('/').pop() || ''
+  // Search scormcontent/assets/
+  const found = zip.file(`scormcontent/assets/${filename}`)
+  if (found) return found
+  // Try recursive search
+  const files = zip.file(new RegExp(filename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$')) as JSZip.JSZipObject[] | null
+  return files?.[0] || null
+}
+
+function stripRiseWrappers(html: string): string {
+  if (!html) return ''
+  // Remove Rise editor wrapper divs but keep inner content
+  return html
+    .replace(/<div[^>]*data-editor-id="[^"]*"[^>]*>/gi, '')
+    .replace(/<div[^>]*class="rise-[^"]*"[^>]*>/gi, '')
+    .replace(/<\/div>/gi, '')
+    .trim()
+}
+
+// ── Type definitions ──────────────────────────────────────────────────────────
+
+interface RiseCourseData {
+  course: {
+    title: string
+    lessons: RiseLesson[]
+  }
+}
+
+interface RiseLesson {
+  id: string
+  title: string
+  type: string
+  items: RiseItem[]
+}
+
+interface RiseItem {
+  id: string
+  type: string
+  family: string
+  variant: string
+  items: RiseSubItem[]
+  settings: Record<string, unknown>
+}
+
+interface RiseSubItem {
+  id: string
+  heading?: string
+  paragraph?: string
+  body?: string
+  text?: string
+  title?: string
+  label?: string
+  date?: string
+  front?: string
+  back?: string
+  attribution?: string
+  author?: string
+  url?: string
+  media?: {
+    image?: {
+      key: string
+      crushedKey: string
+      type: string
+    }
+    video?: {
+      key: string
+      url: string
+      inputKey: string
+      poster: string
+    }
+  }
+  caption?: string
+  quote?: string
+}
+
+// ── Generic SCORM HTML parser (fallback) ──────────────────────────────────────
+
+async function parseGenericScorm(zip: JSZip, warnings: string[]): Promise<ImportResult> {
+  const manifestFile = zip.file('imsmanifest.xml')
+  if (!manifestFile) throw new Error('No imsmanifest.xml found — not a valid SCORM package.')
 
   const manifestXml = await manifestFile.async('string')
   const manifest = parseHtml(manifestXml, { lowerCaseTagName: true })
 
-  // Course title
   const orgTitle = manifest.querySelector('organization > title')
   const courseTitle = orgTitle?.text?.trim() || 'Imported Course'
-
-  // SCO items
   const items = manifest.querySelectorAll('item[identifierref]')
-
-  if (items.length === 0) {
-    warnings.push('No SCO items found in manifest — importing as single lesson.')
-  }
-
   const lessons: ImportedLesson[] = []
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i]
     const identifierRef = item.getAttribute('identifierref') || ''
     const itemTitle = item.querySelector('title')?.text?.trim() || `Lesson ${i + 1}`
-
-    // Find resource href
     const resource = manifest.querySelector(`resource[identifier="${identifierRef}"]`)
     const href = resource?.getAttribute('href') || ''
+    if (!href) continue
 
-    if (!href) {
-      warnings.push(`Lesson "${itemTitle}" has no launchable resource — skipping.`)
-      continue
-    }
-
-    // Find and read the HTML file
-    const htmlFile = zip.file(href) || zip.file(href.replace(/\//g, '\\'))
-    if (!htmlFile) {
-      warnings.push(`Could not find HTML file for "${itemTitle}" (${href}) — skipping.`)
-      continue
-    }
+    const htmlFile = zip.file(href)
+    if (!htmlFile) continue
 
     const htmlContent = await htmlFile.async('string')
-    const blocks = await extractBlocksFromHtml(htmlContent, warnings, zip, href)
-
-    lessons.push({
-      title: itemTitle,
-      position: i,
-      blocks,
-    })
-  }
-
-  // If no SCO items, try to import body content as a single lesson
-  if (lessons.length === 0) {
-    const htmlFiles = Object.keys(zip.files).filter((f) =>
-      f.endsWith('.html') || f.endsWith('.htm')
-    ).filter((f) => !f.includes('_sco') && f.split('/').length <= 2)
-
-    for (let i = 0; i < Math.min(htmlFiles.length, 1); i++) {
-      const file = zip.file(htmlFiles[i])
-      if (!file) continue
-      const html = await file.async('string')
-      const blocks = await extractBlocksFromHtml(html, warnings, zip, htmlFiles[i])
-      lessons.push({ title: courseTitle, position: 0, blocks })
-    }
+    const blocks = await extractBlocksFromHtml(htmlContent, warnings)
+    lessons.push({ title: itemTitle, position: i, blocks, mediaFiles: [] })
   }
 
   return { courseTitle, lessons, warnings }
 }
 
-// ── HTML-to-block mapper ──────────────────────────────────────────────────────
-
-async function extractBlocksFromHtml(
-  html: string,
-  warnings: string[],
-  _zip: JSZip,
-  _sourcePath: string
-): Promise<ImportedBlock[]> {
+async function extractBlocksFromHtml(html: string, warnings: string[]): Promise<ImportedBlock[]> {
   const doc = parseHtml(html, { lowerCaseTagName: true })
-  const blocks: ImportedBlock[] = []
-  let position = 0
-
-  // Remove script/style/nav/header elements for cleaner parsing
   doc.querySelectorAll('script, style, nav, header, footer').forEach((el) => el.remove())
 
-  // Try Rise-specific block mapping first
-  const riseBlocks = doc.querySelectorAll('[class*="rise-block"], [class*="block-"]')
-
-  if (riseBlocks.length > 0) {
-    for (const el of riseBlocks) {
-      const block = mapRiseElement(el, position)
-      if (block) {
-        blocks.push(block)
-        position++
-      }
-    }
-    return blocks
-  }
-
-  // Generic HTML extraction — map common elements to block types
   const body = doc.querySelector('body') || doc
-  const children = body.childNodes
+  const bodyContent = body.innerHTML?.trim()
 
-  let currentHtml = ''
+  if (!bodyContent) return []
 
-  function flushText() {
-    const trimmed = currentHtml.trim()
-    if (trimmed && trimmed.length > 0) {
-      blocks.push({
-        type: 'text',
-        position: position++,
-        content: { html: trimmed },
-        settings: {},
-      })
-      currentHtml = ''
-    }
-  }
-
-  for (const node of children) {
-    const tag = (node as { tagName?: string }).tagName?.toLowerCase() || ''
-    const el = node as ReturnType<typeof parseHtml>
-
-    if (tag === 'img') {
-      flushText()
-      blocks.push({
-        type: 'image',
-        position: position++,
-        content: {
-          alt: el.getAttribute('alt') || '',
-          publicUrl: el.getAttribute('src') || '',
-        },
-        settings: {},
-        importWarning: 'Image URL may not resolve — update in editor',
-      })
-    } else if (tag === 'video') {
-      flushText()
-      const src = el.querySelector('source')?.getAttribute('src') || el.getAttribute('src') || ''
-      blocks.push({
-        type: 'video',
-        position: position++,
-        content: { src, type: 'upload' },
-        settings: {},
-        importWarning: 'Video URL may not resolve — update in editor',
-      })
-    } else if (tag === 'audio') {
-      flushText()
-      const src = el.querySelector('source')?.getAttribute('src') || el.getAttribute('src') || ''
-      blocks.push({
-        type: 'audio',
-        position: position++,
-        content: { src },
-        settings: {},
-        importWarning: 'Audio URL may not resolve — update in editor',
-      })
-    } else if (tag === 'blockquote') {
-      flushText()
-      blocks.push({
-        type: 'quote',
-        position: position++,
-        content: { text: el.innerHTML || '' },
-        settings: {},
-      })
-    } else if (tag === 'pre' || tag === 'code') {
-      flushText()
-      blocks.push({
-        type: 'code_block',
-        position: position++,
-        content: { code: el.text || '', language: 'text' },
-        settings: {},
-      })
-    } else if (tag === 'hr') {
-      flushText()
-      blocks.push({
-        type: 'divider',
-        position: position++,
-        content: { style: 'solid' },
-        settings: {},
-      })
-    } else if (['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'table', 'div'].includes(tag)) {
-      currentHtml += el.outerHTML + '\n'
-    } else if (el.outerHTML) {
-      currentHtml += el.outerHTML + '\n'
-    }
-  }
-
-  flushText()
-
-  // If no structured blocks found, preserve entire body as raw_html
-  if (blocks.length === 0) {
-    const bodyContent = body.innerHTML?.trim()
-    if (bodyContent) {
-      warnings.push('Could not map content to structured blocks — preserved as raw HTML for manual re-authoring.')
-      blocks.push({
-        type: 'raw_html',
-        position: 0,
-        content: { html: bodyContent },
-        settings: {},
-        importWarning: 'Imported as raw HTML — restructure in editor',
-      })
-    }
-  }
-
-  return blocks
-}
-
-// ── Rise-specific block mapper ────────────────────────────────────────────────
-
-function mapRiseElement(el: ReturnType<typeof parseHtml>, position: number): ImportedBlock | null {
-  const className = el.getAttribute('class') || ''
-
-  // Text
-  if (className.includes('rise-block-text') || className.includes('block-text')) {
-    return { type: 'text', position, content: { html: el.innerHTML || '' }, settings: {} }
-  }
-
-  // Image
-  if (className.includes('rise-block-image')) {
-    const img = el.querySelector('img')
-    return {
-      type: 'image', position,
-      content: { publicUrl: img?.getAttribute('src') || '', alt: img?.getAttribute('alt') || '' },
-      settings: {},
-      importWarning: 'Image URL may need updating',
-    }
-  }
-
-  // Video
-  if (className.includes('rise-block-video')) {
-    const iframe = el.querySelector('iframe')
-    const video = el.querySelector('video')
-    const src = iframe?.getAttribute('src') || video?.getAttribute('src') || ''
-    const type = src.includes('youtube') ? 'youtube' : src.includes('vimeo') ? 'vimeo' : 'upload'
-    return { type: 'video', position, content: { src, type }, settings: {} }
-  }
-
-  // Accordion
-  if (className.includes('rise-block-accordion')) {
-    const items = el.querySelectorAll('.accordion-item').map((item, i) => ({
-      id: `imported_${i}`,
-      title: item.querySelector('.accordion-title')?.text?.trim() || `Item ${i + 1}`,
-      bodyHtml: item.querySelector('.accordion-body')?.innerHTML || '',
-    }))
-    return { type: 'accordion', position, content: { items }, settings: {} }
-  }
-
-  // Tabs
-  if (className.includes('rise-block-tabs')) {
-    const items = el.querySelectorAll('.tab-item').map((item, i) => ({
-      id: `imported_${i}`,
-      label: item.querySelector('.tab-label')?.text?.trim() || `Tab ${i + 1}`,
-      bodyHtml: item.querySelector('.tab-body')?.innerHTML || '',
-    }))
-    return { type: 'tabs', position, content: { items }, settings: {} }
-  }
-
-  // Process
-  if (className.includes('rise-block-process')) {
-    const items = el.querySelectorAll('.process-step').map((step, i) => ({
-      id: `imported_${i}`,
-      title: step.querySelector('.step-title')?.text?.trim() || `Step ${i + 1}`,
-      bodyHtml: step.querySelector('.step-body')?.innerHTML || '',
-    }))
-    return { type: 'process', position, content: { items }, settings: {} }
-  }
-
-  // Quote
-  if (className.includes('rise-block-quote')) {
-    const blockquote = el.querySelector('blockquote')
-    return {
-      type: 'quote', position,
-      content: { text: blockquote?.innerHTML || el.innerHTML || '' },
-      settings: {},
-    }
-  }
-
-  // Quiz
-  if (className.includes('rise-block-quiz')) {
-    return {
-      type: 'quiz', position,
-      content: { questions: [], passingScore: 80 },
-      settings: {},
-      importWarning: 'Quiz content could not be automatically imported — rebuild questions in editor',
-    }
-  }
-
-  // Flashcards
-  if (className.includes('rise-block-flashcard')) {
-    const cards = el.querySelectorAll('.card').map((card, i) => ({
-      id: `imported_${i}`,
-      frontHtml: card.querySelector('.card-front')?.innerHTML || '',
-      backHtml: card.querySelector('.card-back')?.innerHTML || '',
-    }))
-    return { type: 'flashcards', position, content: { cards }, settings: {} }
-  }
-
-  // data-block-type attribute (some Rise versions)
-  const blockType = el.getAttribute('data-block-type')
-  if (blockType) {
-    return { type: blockType, position, content: { html: el.innerHTML }, settings: {} }
-  }
-
-  // Fallback — raw HTML
-  return {
-    type: 'raw_html', position,
-    content: { html: el.outerHTML },
+  warnings.push('Generic SCORM HTML imported as raw content — restructure in editor')
+  return [{
+    type: 'raw_html',
+    position: 0,
+    content: { html: bodyContent },
     settings: {},
-    importWarning: 'Could not map to a known block type — preserved as raw HTML',
-  }
+    importWarning: 'Imported as raw HTML — restructure in editor',
+  }]
 }

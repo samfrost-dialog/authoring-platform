@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerClient, createAdminClient } from '@/lib/db/server'
 import { parseScormPackage } from '@/lib/scorm/import/parser'
-import { fetchBuffer, deleteObject, importStagingKey } from '@/lib/r2/client'
+import { fetchBuffer, deleteObject, importStagingKey, uploadBuffer, mediaKey } from '@/lib/r2/client'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -24,10 +24,7 @@ export async function POST(request: Request) {
   const key = importStagingKey(sessionId)
 
   try {
-    // Fetch the ZIP from R2
     const buffer = await fetchBuffer(key)
-
-    // Parse the SCORM package
     const { courseTitle, lessons, warnings } = await parseScormPackage(buffer)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -64,17 +61,39 @@ export async function POST(request: Request) {
         continue
       }
 
-      if (lesson.blocks.length > 0) {
-        const blockInserts = lesson.blocks.map((block) => ({
-          lesson_id: lessonRow.id,
-          type:      block.type,
-          position:  block.position,
-          content:   block.content,
-          settings:  block.settings,
-        }))
+      // Upload extracted media files to R2 and rewrite block content URLs
+      const keyMap: Record<string, string> = {}
+      for (const media of lesson.mediaFiles || []) {
+        try {
+          const r2Key = mediaKey(orgUser.org_id, course.id, media.key.split('/').pop()!)
+          await uploadBuffer(r2Key, media.data, media.contentType)
+          const publicDomain = process.env.R2_PUBLIC_DOMAIN || ''
+          keyMap[media.key] = `${publicDomain}/${r2Key}`
+        } catch (e) {
+          warnings.push(`Failed to upload media: ${media.key}`)
+        }
+      }
 
+      // Rewrite block content to use real R2 URLs
+      const blocks = lesson.blocks.map((block) => {
+        const content = { ...block.content }
+        if (content.src && typeof content.src === 'string' && keyMap[content.src as string]) {
+          content.src = keyMap[content.src as string]
+          content.publicUrl = content.src
+        }
+        return { ...block, content }
+      })
+
+      if (blocks.length > 0) {
         const { error: blocksError } = await adminSupabase
-          .from('blocks').insert(blockInserts)
+          .from('blocks')
+          .insert(blocks.map((block) => ({
+            lesson_id: lessonRow.id,
+            type:      block.type,
+            position:  block.position,
+            content:   block.content,
+            settings:  block.settings,
+          })))
 
         if (blocksError) {
           warnings.push(`Failed to insert blocks for "${lesson.title}": ${blocksError.message}`)
@@ -82,7 +101,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // Clean up staging file
     await deleteObject(key).catch(() => {})
 
     return NextResponse.json({
@@ -95,7 +113,6 @@ export async function POST(request: Request) {
 
   } catch (err) {
     console.error('SCORM process error:', err)
-    // Clean up on failure
     await deleteObject(key).catch(() => {})
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Import failed' },
