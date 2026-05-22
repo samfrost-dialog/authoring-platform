@@ -1,6 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import QuizBuilder from '@/components/quiz/quiz-builder'
 import type { Block } from './types'
 
 const TiptapEditor = dynamic(
@@ -365,6 +366,8 @@ export default function BlockInspector({ block, courseId, onUpdateContent, onUpd
       case 'checkbox_list': return <ChecklistInspector {...props} />
       case 'embed':         return <EmbedInspector {...props} />
       case 'statement':     return <StatementInspector {...props} />
+      case 'quiz':          return <QuizBuilder content={block.content} onChange={(c) => onUpdateContent(c as Record<string, unknown>)} isKnowledgeCheck={false} />
+      case 'knowledge_check': return <QuizBuilder content={block.content} onChange={(c) => onUpdateContent(c as Record<string, unknown>)} isKnowledgeCheck={true} />
       default:              return <GenericInspector block={block} />
     }
   })()

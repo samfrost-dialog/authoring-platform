@@ -1,6 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
+
+const QuizRuntime = dynamic(() => import('@/components/quiz/quiz-runtime'), { ssr: false })
 type Block = { id: string; lesson_id: string; type: string; position: number; content: Record<string, unknown>; settings: Record<string, unknown>; created_at: string }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -195,15 +198,15 @@ function BlockContent({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
       )
 
     case 'quiz':
-    case 'knowledge_check':
-      return (
-        <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center">
-          <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center mx-auto mb-3">
-            <span className="text-white font-bold">?</span>
-          </div>
-          <p className="text-gray-600 text-sm">Quiz engine coming in Phase 3</p>
-        </div>
+      if (!c.questions?.length) return (
+        <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center text-gray-400 text-sm">No questions added yet</div>
       )
+      return <QuizRuntime content={c} isKnowledgeCheck={false} />
+    case 'knowledge_check':
+      if (!c.questions?.length) return (
+        <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center text-gray-400 text-sm">No questions added yet</div>
+      )
+      return <QuizRuntime content={c} isKnowledgeCheck={true} />
 
     case 'scenario':
       return (
