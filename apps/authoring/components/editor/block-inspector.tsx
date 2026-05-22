@@ -323,6 +323,56 @@ function StatementInspector({ block, onUpdate }: IP) {
   )
 }
 
+
+function ColumnsInspector({ block, onUpdateContent }: { block: Block; onUpdateContent: (c: Record<string, unknown>) => void }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cols = (block.content?.columns as any[]) || []
+
+  function updateColText(colIndex: number, blockIndex: number, html: string) {
+    const newCols = cols.map((col: { widthPct: number; blocks: Array<{ type: string; content: Record<string, unknown>; settings: Record<string, unknown> }> }, ci: number) =>
+      ci === colIndex
+        ? { ...col, blocks: col.blocks.map((b, bi: number) => bi === blockIndex ? { ...b, content: { ...b.content, html } } : b) }
+        : col
+    )
+    onUpdateContent({ ...block.content, columns: newCols })
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-[#666] text-xs">{cols.length} column{cols.length !== 1 ? 's' : ''}</p>
+      {cols.map((col: { widthPct: number; blocks: Array<{ type: string; content: Record<string, unknown>; settings: Record<string, unknown> }> }, ci: number) => (
+        <div key={ci} className="border border-[#2A2A2E] rounded-xl p-3 space-y-3">
+          <p className="text-[#555] text-[10px] uppercase tracking-wider">Column {ci + 1} · {col.widthPct}%</p>
+          {(col.blocks || []).map((b, bi: number) => (
+            <div key={bi}>
+              <p className="text-[#555] text-[10px] mb-1.5 capitalize">{b.type.replace(/_/g, ' ')}</p>
+              {b.type === 'text' && (
+                <textarea
+                  value={typeof b.content?.html === 'string' ? b.content.html.replace(/<[^>]*>/g, '') : ''}
+                  onChange={(e) => updateColText(ci, bi, `<p>${e.target.value}</p>`)}
+                  rows={4}
+                  placeholder="Text content…"
+                  className="w-full bg-[#0F0F10] border border-[#2A2A2E] rounded-lg px-3 py-2 text-white text-xs placeholder:text-[#444] focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+                />
+              )}
+              {b.type === 'image' && (
+                <div className="flex items-center gap-2 bg-[#0F0F10] border border-[#2A2A2E] rounded-lg px-3 py-2">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[#555] flex-shrink-0">
+                    <rect x="1" y="1" width="10" height="10" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+                    <circle cx="4" cy="4" r="1" stroke="currentColor" strokeWidth="1.2"/>
+                    <path d="M1 8l3-3 2 2 2-2 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <span className="text-[#666] text-xs truncate">{b.content?.publicUrl ? 'Image set' : 'No image'}</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function GenericInspector({ block }: { block: Block }) {
   return (
     <div className="bg-[#141416] border border-[#1E1E22] rounded-lg p-3">
@@ -370,6 +420,7 @@ export default function BlockInspector({ block, courseId, onUpdateContent, onUpd
       case 'quiz':          return <QuizBuilder content={block.content} onChange={(c) => onUpdateContent(c as unknown as Record<string, unknown>)} isKnowledgeCheck={false} />
       case 'knowledge_check': return <QuizBuilder content={block.content} onChange={(c) => onUpdateContent(c as unknown as Record<string, unknown>)} isKnowledgeCheck={true} />
       case 'scenario':      return <ScenarioBuilder content={block.content as unknown as import('@/components/quiz/scenario-types').ScenarioContent} onChange={(c) => onUpdateContent(c as unknown as Record<string, unknown>)} />
+      case 'columns':      return <ColumnsInspector block={block} onUpdateContent={onUpdateContent} />
       default:              return <GenericInspector block={block} />
     }
   })()
