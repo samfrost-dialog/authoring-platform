@@ -3,14 +3,13 @@ import { createServerClient } from '@/lib/db/server'
 import { deleteObject } from '@/lib/r2/client'
 
 export async function DELETE(request: Request) {
-  const supabase = await createServerClient()
+  const supabase = await createServerClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { key } = await request.json()
   if (!key) return NextResponse.json({ error: 'Missing key' }, { status: 400 })
 
-  // Verify the key belongs to the user's org
   const { data: orgUser } = await supabase
     .from('org_users')
     .select('org_id')

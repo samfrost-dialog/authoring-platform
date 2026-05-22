@@ -20,7 +20,7 @@ const MAX_SIZES: Record<string, number> = {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createServerClient()
+  const supabase = await createServerClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
