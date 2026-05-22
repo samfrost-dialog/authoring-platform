@@ -21,6 +21,8 @@ export default function EditorToolbar({ course, saveStatus }: Props) {
   const [themes, setThemes] = useState<Theme[]>([])
   const [currentThemeId, setCurrentThemeId] = useState<string | null>(course.theme_id)
   const [themeOpen, setThemeOpen] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/themes')
@@ -40,6 +42,25 @@ export default function EditorToolbar({ course, saveStatus }: Props) {
   }
 
   const currentTheme = themes.find((t) => t.id === currentThemeId)
+
+  async function handleExport() {
+    setExporting(true)
+    setExportError(null)
+    try {
+      const res = await fetch(`/api/courses/${course.id}/export`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Export failed')
+      // Trigger download
+      const a = document.createElement('a')
+      a.href = data.downloadUrl
+      a.download = data.filename
+      a.click()
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'Export failed')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <div className="h-12 flex items-center justify-between px-4 bg-[#111113] border-b border-[#1E1E22] flex-shrink-0">
@@ -160,15 +181,27 @@ export default function EditorToolbar({ course, saveStatus }: Props) {
         </button>
 
         <button
-          className="flex items-center gap-1.5 text-[#666] hover:text-[#ccc] text-sm px-3 py-1.5 rounded-md hover:bg-white/5 transition-colors"
-          title="Export SCORM (Phase 4)"
+          onClick={handleExport}
+          disabled={exporting}
+          className="flex items-center gap-1.5 text-[#666] hover:text-[#ccc] disabled:opacity-50 text-sm px-3 py-1.5 rounded-md hover:bg-white/5 transition-colors"
+          title="Export SCORM 1.2"
         >
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <path d="M6.5 1v7M4 6l2.5 2.5L9 6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M1 10v1.5A1.5 1.5 0 002.5 13h8a1.5 1.5 0 001.5-1.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-          </svg>
-          Export
+          {exporting ? (
+            <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+            </svg>
+          ) : (
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M6.5 1v7M4 6l2.5 2.5L9 6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M1 10v1.5A1.5 1.5 0 002.5 13h8a1.5 1.5 0 001.5-1.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+          )}
+          {exporting ? 'Exporting…' : 'Export'}
         </button>
+        {exportError && (
+          <span className="text-red-400 text-xs">{exportError}</span>
+        )}
       </div>
     </div>
   )
