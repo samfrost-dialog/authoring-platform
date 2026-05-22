@@ -124,7 +124,7 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
                 ) : (
                   <div className="space-y-6">
                     {activeBlocks.map((block) => (
-                      <PreviewBlockRenderer key={block.id} block={block} theme={{ primary, accent, text, bg, headingFont, bodyFont }} />
+                      <PreviewBlockRenderer key={block.id} block={block} theme={{ primary, accent, text, bg, headingFont, bodyFont }} courseId={course.id} />
                     ))}
                   </div>
                 )}

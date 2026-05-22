@@ -3,10 +3,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Question, QuizContent, QuizAttempt } from './quiz-types'
 import { scoreQuiz, isCorrect } from './quiz-types'
+import { useScormTracking } from './use-scorm-tracking'
 
 interface Props {
   content: QuizContent
   isKnowledgeCheck?: boolean
+  courseId?: string
   onComplete?: (attempt: QuizAttempt) => void
 }
 
@@ -194,7 +196,7 @@ function OrderingInput({ q, value, onChange }: { q: Question & { type: 'ordering
 
 // ── Main quiz runtime ─────────────────────────────────────────────────────────
 
-export default function QuizRuntime({ content, isKnowledgeCheck = false, onComplete }: Props) {
+export default function QuizRuntime({ content, isKnowledgeCheck = false, courseId = '', onComplete }: Props) {
   const [phase, setPhase] = useState<Phase>('intro')
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, unknown>>({})
@@ -236,10 +238,19 @@ export default function QuizRuntime({ content, isKnowledgeCheck = false, onCompl
     }
   }
 
+  const { recordAttempt } = useScormTracking({
+    courseId,
+    questions,
+    passingScore: content.passingScore,
+  })
+
   function finishQuiz() {
     const score = scoreQuiz(questions, answers)
     const passed = score >= content.passingScore
     const result: QuizAttempt = { answers, score, passed, completed: true, startedAt: startTime }
+    if (!isKnowledgeCheck) {
+      recordAttempt(result)
+    }
     onComplete?.(result)
     setPhase('results')
   }

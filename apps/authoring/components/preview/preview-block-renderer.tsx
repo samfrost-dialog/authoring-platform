@@ -12,7 +12,7 @@ type C = Record<string, any>
 
 type BlockTheme = { primary: string; accent: string; text: string; bg: string; headingFont: string; bodyFont: string }
 
-export default function PreviewBlockRenderer({ block, theme }: { block: Block; theme?: BlockTheme }) {
+export default function PreviewBlockRenderer({ block, theme, courseId }: { block: Block; theme?: BlockTheme; courseId?: string }) {
   const t = theme ?? { primary: '#4F46E5', accent: '#06B6D4', text: '#111827', bg: '#FFFFFF', headingFont: 'Inter', bodyFont: 'Inter' }
   const c: C = block.content || {}
   const spacing = block.settings?.spacing || 'normal'
@@ -20,12 +20,12 @@ export default function PreviewBlockRenderer({ block, theme }: { block: Block; t
 
   return (
     <div className={py}>
-      <BlockContent block={block} c={c} t={t} />
+      <BlockContent block={block} c={c} t={t} courseId={courseId} />
     </div>
   )
 }
 
-function BlockContent({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
+function BlockContent({ block, c, t, courseId }: { block: Block; c: C; t: BlockTheme; courseId?: string }) {
   switch (block.type) {
 
     case 'text':
@@ -202,12 +202,12 @@ function BlockContent({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
       if (!c.questions?.length) return (
         <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center text-gray-400 text-sm">No questions added yet</div>
       )
-      return <QuizRuntime content={c as unknown as import('@/components/quiz/quiz-types').QuizContent} isKnowledgeCheck={false} />
+      return <QuizRuntime content={c as unknown as import('@/components/quiz/quiz-types').QuizContent} isKnowledgeCheck={false} courseId={courseId} />
     case 'knowledge_check':
       if (!c.questions?.length) return (
         <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center text-gray-400 text-sm">No questions added yet</div>
       )
-      return <QuizRuntime content={c as unknown as import('@/components/quiz/quiz-types').QuizContent} isKnowledgeCheck={true} />
+      return <QuizRuntime content={c as unknown as import('@/components/quiz/quiz-types').QuizContent} isKnowledgeCheck={true} courseId={courseId} />
 
     case 'scenario':
       if (!c.scenes?.length) return (

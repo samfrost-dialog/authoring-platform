@@ -165,19 +165,23 @@ function AccordionBlock({ content }: { content: { items?: Array<{ title: string 
   )
 }
 
-function QuizBlock({ content }: { content: { questions?: Array<{ prompt?: string }> } }) {
+function QuizBlock({ content, isKnowledgeCheck }: { content: { questions?: Array<{ prompt?: string }> }; isKnowledgeCheck: boolean }) {
   const questions = content.questions || []
+  const color = isKnowledgeCheck ? 'emerald' : 'indigo'
+  const label = isKnowledgeCheck ? 'Knowledge Check' : 'Quiz'
   return (
-    <div className="bg-[#141416] border border-[#2A2A2E] rounded-lg p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-5 h-5 rounded-full bg-indigo-500/20 flex items-center justify-center">
-          <span className="text-indigo-400 text-xs font-bold">?</span>
+    <div className={`border rounded-lg p-4 ${isKnowledgeCheck ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-[#141416] border-[#2A2A2E]'}`}>
+      <div className="flex items-center gap-2 mb-2">
+        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${isKnowledgeCheck ? 'bg-emerald-500/20' : 'bg-indigo-500/20'}`}>
+          <span className={`text-xs font-bold ${isKnowledgeCheck ? 'text-emerald-400' : 'text-indigo-400'}`}>?</span>
         </div>
-        <span className="text-[#888] text-xs font-medium uppercase tracking-wider">Quiz</span>
+        <span className={`text-xs font-medium uppercase tracking-wider ${isKnowledgeCheck ? 'text-emerald-400' : 'text-[#888]'}`}>{label}</span>
         <span className="text-[#555] text-xs ml-auto">{questions.length} question{questions.length !== 1 ? 's' : ''}</span>
       </div>
-      {questions.length === 0 && (
-        <p className="text-[#555] text-xs">Add questions in the inspector</p>
+      {questions.length === 0 ? (
+        <p className="text-[#555] text-xs">Add questions in the inspector →</p>
+      ) : (
+        <p className="text-[#555] text-xs truncate">{(questions[0] as { prompt?: string }).prompt || 'No prompt set'}{questions.length > 1 ? ` + ${questions.length - 1} more` : ''}</p>
       )}
     </div>
   )
@@ -219,8 +223,8 @@ export default function BlockRenderer({ block }: { block: Block }) {
     case 'spacer':         return <SpacerBlock content={content} />
     case 'code_block':     return <CodeBlock content={content} />
     case 'accordion':      return <AccordionBlock content={content} />
-    case 'quiz':
-    case 'knowledge_check': return <QuizBlock content={content} />
+    case 'quiz':           return <QuizBlock content={content} isKnowledgeCheck={false} />
+    case 'knowledge_check': return <QuizBlock content={content} isKnowledgeCheck={true} />
     case 'button':         return <ButtonBlock content={content} />
     default:
       return (
