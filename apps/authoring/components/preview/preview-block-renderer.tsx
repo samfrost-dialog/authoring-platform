@@ -4,6 +4,7 @@ import { useState } from 'react'
 import dynamic from 'next/dynamic'
 
 const QuizRuntime = dynamic(() => import('@/components/quiz/quiz-runtime'), { ssr: false })
+const ScenarioRuntime = dynamic(() => import('@/components/quiz/scenario-runtime'), { ssr: false })
 type Block = { id: string; lesson_id: string; type: string; position: number; content: Record<string, unknown>; settings: Record<string, unknown>; created_at: string }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -209,11 +210,10 @@ function BlockContent({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
       return <QuizRuntime content={c as unknown as import('@/components/quiz/quiz-types').QuizContent} isKnowledgeCheck={true} />
 
     case 'scenario':
-      return (
-        <div className="bg-purple-50 border border-purple-100 rounded-xl p-6 text-center">
-          <p className="text-gray-600 text-sm">Branching scenario coming in Phase 3</p>
-        </div>
+      if (!c.scenes?.length) return (
+        <div className="bg-purple-50 border border-purple-100 rounded-xl p-6 text-center text-gray-400 text-sm">No scenes added yet</div>
       )
+      return <ScenarioRuntime content={c as unknown as import('@/components/quiz/scenario-types').ScenarioContent} />
 
     case 'continue':
       return (
