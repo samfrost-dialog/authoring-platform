@@ -6,19 +6,22 @@ type Block = { id: string; lesson_id: string; type: string; position: number; co
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type C = Record<string, any>
 
-export default function PreviewBlockRenderer({ block }: { block: Block }) {
+type BlockTheme = { primary: string; accent: string; text: string; bg: string; headingFont: string; bodyFont: string }
+
+export default function PreviewBlockRenderer({ block, theme }: { block: Block; theme?: BlockTheme }) {
+  const t = theme ?? { primary: '#4F46E5', accent: '#06B6D4', text: '#111827', bg: '#FFFFFF', headingFont: 'Inter', bodyFont: 'Inter' }
   const c: C = block.content || {}
   const spacing = block.settings?.spacing || 'normal'
   const py = spacing === 'compact' ? 'py-1' : spacing === 'loose' ? 'py-6' : 'py-2'
 
   return (
     <div className={py}>
-      <BlockContent block={block} c={c} />
+      <BlockContent block={block} c={c} t={t} />
     </div>
   )
 }
 
-function BlockContent({ block, c }: { block: Block; c: C }) {
+function BlockContent({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
   switch (block.type) {
 
     case 'text':
@@ -96,7 +99,7 @@ function BlockContent({ block, c }: { block: Block; c: C }) {
     case 'callout':
       return (
         <div className="flex gap-3 rounded-lg p-4 border-l-4"
-          style={{ backgroundColor: c.bgColor || '#EEF2FF', borderColor: c.borderColor || '#4F46E5' }}>
+          style={{ backgroundColor: c.bgColor || t.primary + '15', borderColor: c.borderColor || t.primary }}>
           <span className="text-xl flex-shrink-0 mt-0.5">{c.icon || '💡'}</span>
           <div className="prose prose-sm max-w-none text-gray-800" dangerouslySetInnerHTML={{ __html: c.html || '' }} />
         </div>

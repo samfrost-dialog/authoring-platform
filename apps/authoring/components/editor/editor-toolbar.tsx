@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import type { Course } from './types'
 
 interface Props {
@@ -9,8 +10,36 @@ interface Props {
   saveStatus: 'saved' | 'saving' | 'unsaved'
 }
 
+interface Theme {
+  id: string
+  name: string
+  primary_color: string | null
+}
+
 export default function EditorToolbar({ course, saveStatus }: Props) {
   const router = useRouter()
+  const [themes, setThemes] = useState<Theme[]>([])
+  const [currentThemeId, setCurrentThemeId] = useState<string | null>(course.theme_id)
+  const [themeOpen, setThemeOpen] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/themes')
+      .then((r) => r.json())
+      .then((data) => Array.isArray(data) && setThemes(data))
+      .catch(() => {})
+  }, [])
+
+  async function handleThemeChange(themeId: string | null) {
+    setCurrentThemeId(themeId)
+    setThemeOpen(false)
+    await fetch(`/api/courses/${course.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ theme_id: themeId }),
+    })
+  }
+
+  const currentTheme = themes.find((t) => t.id === currentThemeId)
 
   return (
     <div className="h-12 flex items-center justify-between px-4 bg-[#111113] border-b border-[#1E1E22] flex-shrink-0">
@@ -56,6 +85,68 @@ export default function EditorToolbar({ course, saveStatus }: Props) {
         }`}>
           {course.status}
         </span>
+
+        {/* Theme picker */}
+        <div className="relative">
+          <button
+            onClick={() => setThemeOpen(!themeOpen)}
+            className="flex items-center gap-1.5 text-[#666] hover:text-[#ccc] text-xs px-3 py-1.5 rounded-md hover:bg-white/5 transition-colors"
+          >
+            {currentTheme?.primary_color && (
+              <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: currentTheme.primary_color }} />
+            )}
+            <span>{currentTheme?.name || 'No theme'}</span>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`transition-transform ${themeOpen ? 'rotate-180' : ''}`}>
+              <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+
+          {themeOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setThemeOpen(false)} />
+              <div className="absolute right-0 top-full mt-1 z-50 bg-[#141416] border border-[#2A2A2E] rounded-xl shadow-2xl py-1 w-48">
+                <button
+                  onClick={() => handleThemeChange(null)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/5 ${!currentThemeId ? 'text-indigo-400' : 'text-[#888]'}`}
+                >
+                  <div className="w-3 h-3 rounded-full bg-[#2A2A2E] flex-shrink-0" />
+                  No theme
+                  {!currentThemeId && (
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="ml-auto">
+                      <path d="M2 5l2 2 4-4" stroke="#818CF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </button>
+                {themes.map((theme) => (
+                  <button
+                    key={theme.id}
+                    onClick={() => handleThemeChange(theme.id)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/5 ${theme.id === currentThemeId ? 'text-indigo-400' : 'text-[#ccc]'}`}
+                  >
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: theme.primary_color || '#4F46E5' }} />
+                    <span className="truncate">{theme.name}</span>
+                    {theme.id === currentThemeId && (
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="ml-auto flex-shrink-0">
+                        <path d="M2 5l2 2 4-4" stroke="#818CF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                  </button>
+                ))}
+                <div className="border-t border-[#1E1E22] mt-1 pt-1">
+                  <button
+                    onClick={() => { setThemeOpen(false); router.push('/dashboard/themes') }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#555] hover:text-indigo-400 hover:bg-white/5 transition-colors"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                      <path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                    </svg>
+                    Manage themes
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
 
         <button
           onClick={() => router.push(`/preview/${course.id}`)}
