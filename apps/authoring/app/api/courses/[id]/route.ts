@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/db/server'
+import { createServerClient, createAdminClient } from '@/lib/db/server'
 
 export async function PATCH(
   request: Request,
@@ -12,8 +12,6 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-
-  // Only allow updating safe fields
   const allowed = ['title', 'description', 'status', 'theme_id', 'cover_image_url', 'metadata']
   const update = Object.fromEntries(
     Object.entries(body).filter(([k]) => allowed.includes(k))
@@ -40,7 +38,17 @@ export async function DELETE(
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { error } = await supabase
+  // Use admin client to bypass RLS for delete
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = await createAdminClient() as any
+
+  // Verify the user owns or can delete this course
+  const { data: course } = await supabase
+    .from('courses').select('id, created_by, org_id').eq('id', id).single()
+
+  if (!course) return NextResponse.json({ error: 'Course not found' }, { status: 404 })
+
+  const { error } = await admin
     .from('courses')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id)

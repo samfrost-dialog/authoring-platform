@@ -21,13 +21,14 @@ const STATUS_STYLES: Record<string, string> = {
 function CourseCard({ course, onDelete }: { course: Course; onDelete: (id: string) => void }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   async function handleDelete(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
-    if (!confirm(`Delete "${course.title}"? This cannot be undone.`)) return
     setDeleting(true)
     setMenuOpen(false)
+    setConfirmDelete(false)
     try {
       const res = await fetch(`/api/courses/${course.id}`, { method: 'DELETE' })
       if (res.ok) onDelete(course.id)
@@ -108,15 +109,31 @@ function CourseCard({ course, onDelete }: { course: Course; onDelete: (id: strin
                   Preview
                 </Link>
                 <div className="h-px bg-[#2A2A2E] mx-2 my-1" />
-                <button
-                  onClick={handleDelete}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors"
-                >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <path d="M2 3h8M5 3V2h2v1M3.5 3l.5 7h4l.5-7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  Delete course
-                </button>
+                {!confirmDelete ? (
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmDelete(true) }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 3h8M5 3V2h2v1M3.5 3l.5 7h4l.5-7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Delete course
+                  </button>
+                ) : (
+                  <div className="px-3 py-2 space-y-2">
+                    <p className="text-xs text-[#888]">Delete this course?</p>
+                    <div className="flex gap-1.5">
+                      <button onClick={handleDelete}
+                        className="flex-1 bg-red-500 hover:bg-red-400 text-white text-xs font-medium py-1.5 rounded-lg transition-colors">
+                        Delete
+                      </button>
+                      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmDelete(false) }}
+                        className="flex-1 bg-[#2A2A2E] hover:bg-[#3A3A3E] text-[#888] text-xs py-1.5 rounded-lg transition-colors">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
