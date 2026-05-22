@@ -59,7 +59,7 @@ function ImageBlock({ content }: { content: { alt?: string; caption?: string; pu
       <div className="space-y-1">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={url} alt={content.alt || ''} className="w-full rounded-lg object-cover max-h-64" />
-        {content.caption && <p className="text-[#666] text-xs text-center">{content.caption}</p>}
+        {content.caption && <div className="text-[#666] text-xs text-center" dangerouslySetInnerHTML={{ __html: String(content.caption).replace(/<[^>]*>/g, '') }} />}
       </div>
     )
   }
@@ -252,6 +252,33 @@ export default function BlockRenderer({ block }: { block: Block }) {
     case 'quiz':           return <QuizBlock content={content} isKnowledgeCheck={false} />
     case 'knowledge_check': return <QuizBlock content={content} isKnowledgeCheck={true} />
     case 'button':         return <ButtonBlock content={content} />
+    case 'columns': {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cols = (content.columns as any[]) || []
+      return (
+        <div className="flex gap-3">
+          {cols.map((col: { widthPct: number; blocks: Array<{ type: string; content: Record<string, unknown>; settings: Record<string, unknown> }> }, i: number) => (
+            <div key={i} className="flex-1 space-y-2 min-w-0">
+              {(col.blocks || []).map((b, j: number) => {
+                const url = (b.content?.publicUrl || b.content?.src) as string | undefined
+                if (b.type === 'image' && url) {
+                  return (
+                    <div key={j}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt="" className="w-full rounded-lg object-cover max-h-48" />
+                    </div>
+                  )
+                }
+                if (b.type === 'text' && b.content?.html) {
+                  return <div key={j} className="text-[#ccc] text-xs leading-relaxed prose-sm" dangerouslySetInnerHTML={{ __html: b.content.html as string }} />
+                }
+                return <div key={j} className="h-12 bg-[#1A1A1C] rounded border border-[#2A2A2E] flex items-center justify-center text-[#444] text-xs">{b.type}</div>
+              })}
+            </div>
+          ))}
+        </div>
+      )
+    }
     default:
       return (
         <PlaceholderBlock
