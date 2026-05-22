@@ -238,6 +238,27 @@ function BlockContent({ block, c, t, courseId }: { block: Block; c: C; t: BlockT
         </div>
       )
 
+    case 'columns': {
+      const cols = (c.columns as Array<{ widthPct: number; blocks: Array<{ type: string; content: Record<string, unknown>; settings: Record<string, unknown> }> }>) || []
+      return (
+        <div className="flex gap-6 items-start flex-wrap md:flex-nowrap">
+          {cols.map((col, i) => (
+            <div key={i} style={{ flex: `0 0 calc(${col.widthPct}% - 0.75rem)`, minWidth: '200px' }}>
+              {(col.blocks || []).map((b, j) => (
+                <BlockContent
+                  key={j}
+                  block={{ id: `col-${i}-${j}`, lesson_id: '', type: b.type, position: j, content: b.content, settings: b.settings, created_at: '' }}
+                  c={b.content as C}
+                  t={t}
+                  courseId={courseId}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      )
+    }
+
     case 'raw_html':
       return <div dangerouslySetInnerHTML={{ __html: c.html || '' }} />
 

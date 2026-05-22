@@ -178,29 +178,26 @@ async function mapRiseItem(
           const contentType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg'
           mediaFiles.push({ key: r2Key, data, contentType })
 
-          const blocks: ImportedBlock[] = [{
+          // For text aside / text overlay variants — render as columns with image + text
+          if (paragraph && (variant === 'text aside' || variant === 'text overlay')) {
+            return {
+              type: 'columns',
+              position: 0,
+              content: {
+                columns: [
+                  { widthPct: 50, blocks: [{ type: 'image', content: { src: r2Key, alt: '', caption, alignment: 'center', size: 'large' }, settings: {} }] },
+                  { widthPct: 50, blocks: [{ type: 'text', content: { html: paragraph }, settings: {} }] },
+                ]
+              },
+              settings: {},
+            }
+          }
+
+          return {
             type: 'image',
             position: 0,
             content: { src: r2Key, alt: '', caption, alignment: 'center', size: 'large' },
             settings: {},
-          }]
-
-          // If there's also text with the image, add a text block
-          if (paragraph) {
-            blocks.push({
-              type: 'text',
-              position: 1,
-              content: { html: paragraph },
-              settings: {},
-            })
-          }
-
-          return blocks.length === 1 ? blocks[0] : {
-            type: 'text',
-            position: 0,
-            content: { html: `<p>${caption}</p>${paragraph}` },
-            settings: {},
-            importWarning: 'Image with text — image extracted separately, see next block',
           }
         }
 
@@ -340,12 +337,20 @@ async function mapRiseItem(
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function findAsset(zip: JSZip, key: string): any {
   const decoded = decodeURIComponent(key)
+  
+  // Try full path first (handles subdirectories like I8MCi2/filename.jpg)
+  const fullPath = `scormcontent/assets/${decoded}`
+  const fullFound = zip.file(fullPath)
+  if (fullFound) return fullFound
+
+  // Try just the filename
   const filename = decoded.split('/').pop() || ''
-  // Search scormcontent/assets/
   const found = zip.file(`scormcontent/assets/${filename}`)
   if (found) return found
-  // Try recursive search
-  const files = zip.file(new RegExp(filename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$')) as JSZip.JSZipObject[] | null
+
+  // Try recursive search by filename
+  const escaped = filename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const files = zip.file(new RegExp(escaped + '$')) as JSZip.JSZipObject[] | null
   return files?.[0] || null
 }
 
