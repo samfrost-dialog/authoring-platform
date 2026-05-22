@@ -81,7 +81,7 @@ export default function TiptapEditor({ content, onChange, placeholder = 'Start t
     if (!editor) return
     const current = editor.getHTML()
     if (content !== current) {
-      editor.commands.setContent(content || '', false)
+      editor.commands.setContent(content || '', { emitUpdate: false })
     }
   }, [content, editor])
 
@@ -91,10 +91,10 @@ export default function TiptapEditor({ content, onChange, placeholder = 'Start t
     const url = window.prompt('URL', prev)
     if (url === null) return
     if (url === '') {
-      editor.chain().focus().extendMarkToWordOrSelection().unsetLink().run()
+      editor.chain().focus().unsetLink().run()
       return
     }
-    editor.chain().focus().extendMarkToWordOrSelection().setLink({ href: url }).run()
+    editor.chain().focus().setLink({ href: url }).run()
   }, [editor])
 
   if (!editor) return null
