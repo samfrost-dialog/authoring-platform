@@ -30,14 +30,10 @@ export function useScormTracking({
     }))
 
     // In SCORM export context: use window.ScormAPI directly
-    if (typeof window !== 'undefined' && (window as Window & { ScormAPI?: unknown }).ScormAPI) {
-      const scorm = (window as Window & { ScormAPI: {
-        setScore: (r: number, min: number, max: number) => void
-        setLessonStatus: (s: string) => void
-        setSuspendData: (d: unknown) => void
-        recordInteraction: (i: number, id: string, type: string, response: string, result: string, latency: number) => void
-        commit: () => void
-      } }).ScormAPI
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const win = window as any
+    if (typeof window !== 'undefined' && win.ScormAPI) {
+      const scorm = win.ScormAPI
       scorm.setScore(attempt.score, 0, 100)
       scorm.setLessonStatus(lessonStatus)
       scorm.setSuspendData({ answers: attempt.answers, score: attempt.score })
