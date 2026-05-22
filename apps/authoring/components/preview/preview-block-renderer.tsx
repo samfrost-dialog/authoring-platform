@@ -201,12 +201,12 @@ function BlockContent({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
       if (!c.questions?.length) return (
         <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center text-gray-400 text-sm">No questions added yet</div>
       )
-      return <QuizRuntime content={c} isKnowledgeCheck={false} />
+      return <QuizRuntime content={c as unknown as import('@/components/quiz/quiz-types').QuizContent} isKnowledgeCheck={false} />
     case 'knowledge_check':
       if (!c.questions?.length) return (
         <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center text-gray-400 text-sm">No questions added yet</div>
       )
-      return <QuizRuntime content={c} isKnowledgeCheck={true} />
+      return <QuizRuntime content={c as unknown as import('@/components/quiz/quiz-types').QuizContent} isKnowledgeCheck={true} />
 
     case 'scenario':
       return (
