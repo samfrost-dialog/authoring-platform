@@ -51,6 +51,20 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: bg, color: text, fontFamily: `'${bodyFont}', system-ui, sans-serif` }}>
       {themeCSS && <style dangerouslySetInnerHTML={{ __html: themeCSS }} />}
       {googleFonts && <style>{`@import url('https://fonts.googleapis.com/css2?${googleFonts}&display=swap');`}</style>}
+      <style>{`
+        .rise-content p { margin: 0 0 0.75em; line-height: 1.6; }
+        .rise-content p:last-child { margin-bottom: 0; }
+        .rise-content strong { font-weight: 600; }
+        .rise-content em { font-style: italic; }
+        .rise-content a { color: ${primary}; text-decoration: underline; }
+        .rise-content ul { margin: 0 0 0.75em; padding-left: 1.5em; }
+        .rise-content ol { margin: 0 0 0.75em; padding-left: 1.5em; }
+        .rise-content li { margin-bottom: 0.25em; }
+        .rise-content table { width: 100%; border-collapse: collapse; margin-bottom: 1em; }
+        .rise-content th, .rise-content td { border: 1px solid ${text}20; padding: 0.5em 0.75em; text-align: left; }
+        .rise-content th { background: ${primary}10; font-weight: 600; }
+        .rise-content span[style] { }
+      `}</style>
 
       {/* Preview banner */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 text-xs text-white z-50" style={{ backgroundColor: '#1e1b4b' }}>

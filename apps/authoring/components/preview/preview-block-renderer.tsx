@@ -63,7 +63,7 @@ function BlockContent({ block, c, t, courseId }: { block: Block; c: C; t: BlockT
       if (!c.html) return null
       return (
         <div
-          className="prose max-w-none leading-relaxed"
+          className="max-w-none leading-relaxed rise-content"
           style={{ color: t.text, fontFamily: `'${t.bodyFont}', sans-serif` }}
           dangerouslySetInnerHTML={{ __html: c.html }}
         />
