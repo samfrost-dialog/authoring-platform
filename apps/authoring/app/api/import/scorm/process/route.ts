@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  const { sessionId } = await request.json()
+  const { sessionId, mode = 'standalone', targetCourseId } = await request.json()
   if (!sessionId) return NextResponse.json({ error: 'Missing sessionId' }, { status: 400 })
 
   const key = importStagingKey(sessionId)
@@ -30,19 +30,37 @@ export async function POST(request: Request) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const adminSupabase = await createAdminClient() as any
 
-    const { data: course, error: courseError } = await adminSupabase
-      .from('courses')
-      .insert({
-        title:      courseTitle,
-        org_id:     orgUser.org_id,
-        created_by: session.user.id,
-        status:     'draft',
-        metadata:   { importedFrom: 'scorm', importedAt: new Date().toISOString() },
-      })
-      .select()
-      .single()
+    let course
+    if (mode === 'into_course' && targetCourseId) {
+      // Use existing course
+      const { data, error } = await adminSupabase
+        .from('courses').select('*').eq('id', targetCourseId).single()
+      if (error) throw error
+      course = data
+    } else {
+      // Create new standalone course
+      const { data, error: courseError } = await adminSupabase
+        .from('courses')
+        .insert({
+          title:      courseTitle,
+          org_id:     orgUser.org_id,
+          created_by: session.user.id,
+          status:     'draft',
+          metadata:   { importedFrom: 'scorm', importedAt: new Date().toISOString() },
+        })
+        .select()
+        .single()
+      if (courseError) throw courseError
+      course = data
+    }
 
-    if (courseError) throw courseError
+    // Find current max position if appending to existing course
+    let positionOffset = 0
+    if (mode === 'into_course' && targetCourseId) {
+      const { data: existingLessons } = await adminSupabase
+        .from('lessons').select('position').eq('course_id', course.id).order('position', { ascending: false }).limit(1)
+      positionOffset = existingLessons?.[0]?.position != null ? existingLessons[0].position + 1 : 0
+    }
 
     for (const lesson of lessons) {
       const { data: lessonRow, error: lessonError } = await adminSupabase
@@ -50,7 +68,7 @@ export async function POST(request: Request) {
         .insert({
           course_id:         course.id,
           title:             lesson.title,
-          position:          lesson.position,
+          position:          lesson.position + positionOffset,
           is_section_header: false,
         })
         .select()
