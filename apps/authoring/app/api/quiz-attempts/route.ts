@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     : null
 
   try {
-    const supabase = await createAdminClient()
+    const supabase = await createAdminClient() as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
     const { data, error } = await supabase
       .from('quiz_attempts')
