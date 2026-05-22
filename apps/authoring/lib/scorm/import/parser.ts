@@ -108,6 +108,7 @@ async function mapRiseItem(
   const sub = item.items?.[0] || {}
   const type = item.type
   const variant = item.variant || ''
+  const riseSettings = item.settings || {}
 
   switch (type) {
     case 'text': {
@@ -115,10 +116,18 @@ async function mapRiseItem(
       const paragraph = sub.paragraph || ''
       const combined = [heading, paragraph].filter(Boolean).join('\n')
       if (!combined.trim()) return null
+      const bgType = (riseSettings as { backgroundType?: string }).backgroundType
+      const bgColor = (riseSettings as { backgroundColor?: string }).backgroundColor
+      const resolvedBg = bgType === 'BLACK' ? '#000000' : bgType === 'COLOR' ? bgColor : bgType === 'ACCENT' ? '__accent__' : null
       return {
         type: 'text',
         position: 0,
-        content: { html: stripRiseWrappers(combined) },
+        content: {
+          html: stripRiseWrappers(combined),
+          riseVariant: variant,
+          backgroundColor: resolvedBg,
+          textWidth: (riseSettings as { textWidth?: number }).textWidth || 100,
+        },
         settings: {},
       }
     }
@@ -130,6 +139,20 @@ async function mapRiseItem(
       const videoData = media.video
 
       if (videoData) {
+        // Try to extract poster image
+        let posterR2Key: string | null = null
+        if (videoData.poster) {
+          const posterKey = decodeURIComponent(videoData.poster)
+          const posterFile = findAsset(zip, posterKey)
+          if (posterFile) {
+            const posterUuid = crypto.randomUUID()
+            const posterExt = posterKey.split('.').pop() || 'jpg'
+            posterR2Key = `__import__/${posterUuid}.${posterExt}`
+            const posterData = Buffer.from(await (posterFile as JSZip.JSZipObject).async('arraybuffer'))
+            mediaFiles.push({ key: posterR2Key, data: posterData, contentType: 'image/jpeg' })
+          }
+        }
+
         // Try to extract local video from ZIP
         const videoKey = decodeURIComponent(videoData.key || '')
         const localPath = `scormcontent/assets/${videoKey.split('/').pop()}`
@@ -144,20 +167,15 @@ async function mapRiseItem(
           return {
             type: 'video',
             position: 0,
-            content: { src: r2Key, type: 'upload', controls: true },
+            content: { src: r2Key, poster: posterR2Key, type: 'upload', controls: true, borderRadius: '0' },
             settings: {},
           }
         }
 
-        // External/transcoded video URL
         return {
           type: 'video',
           position: 0,
-          content: {
-            src: videoData.url || videoData.inputKey || '',
-            type: 'upload',
-            controls: true,
-          },
+          content: { src: videoData.url || videoData.inputKey || '', poster: posterR2Key, type: 'upload', controls: true, borderRadius: '0' },
           settings: {},
           importWarning: 'Video was hosted on Rise CDN — re-upload in editor',
         }
@@ -178,14 +196,62 @@ async function mapRiseItem(
           const contentType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg'
           mediaFiles.push({ key: r2Key, data, contentType })
 
-          // For text aside / text overlay variants — render as columns with image + text
-          if (paragraph && (variant === 'text aside' || variant === 'text overlay')) {
+          const bgType = (riseSettings as { backgroundType?: string }).backgroundType
+          const bgColor = (riseSettings as { backgroundColor?: string }).backgroundColor
+          const resolvedBg = bgType === 'BLACK' ? '#000000' : bgType === 'COLOR' ? bgColor : bgType === 'ACCENT' ? '__accent__' : null
+          const opacity = (riseSettings as { opacity?: number | string }).opacity
+          const opacityColor = (riseSettings as { opacityColor?: string }).opacityColor || '#000000'
+          const zoomOnClick = (riseSettings as { zoomOnClick?: boolean }).zoomOnClick || false
+          const paddingTop = (riseSettings as { paddingTop?: number }).paddingTop ?? 3
+          const paddingBottom = (riseSettings as { paddingBottom?: number }).paddingBottom ?? 3
+
+          // text overlay — full-width hero with text overlaid
+          if (variant === 'text overlay') {
+            return {
+              type: 'image',
+              position: 0,
+              content: {
+                src: r2Key, alt: '', caption, alignment: 'center', size: 'full',
+                riseVariant: 'text overlay',
+                overlayText: caption,
+                overlayOpacity: opacity,
+                overlayColor: opacityColor,
+                backgroundColor: resolvedBg,
+                borderRadius: '0',
+                paddingTop, paddingBottom,
+                zoomOnClick,
+              },
+              settings: {},
+            }
+          }
+
+          // hero — full width image with caption below, accent background
+          if (variant === 'hero') {
+            return {
+              type: 'image',
+              position: 0,
+              content: {
+                src: r2Key, alt: '', caption, alignment: 'center', size: 'full',
+                riseVariant: 'hero',
+                backgroundColor: resolvedBg,
+                borderRadius: '0',
+                paddingTop, paddingBottom,
+                zoomOnClick,
+              },
+              settings: {},
+            }
+          }
+
+          // text aside — two column layout
+          if (paragraph && variant === 'text aside') {
             return {
               type: 'columns',
               position: 0,
               content: {
+                backgroundColor: resolvedBg,
+                paddingTop, paddingBottom,
                 columns: [
-                  { widthPct: 50, blocks: [{ type: 'image', content: { src: r2Key, alt: '', caption, alignment: 'center', size: 'large' }, settings: {} }] },
+                  { widthPct: 50, blocks: [{ type: 'image', content: { src: r2Key, alt: '', caption: 'Click on image to zoom in.', alignment: 'center', size: 'large', borderRadius: '0.5rem', zoomOnClick: true }, settings: {} }] },
                   { widthPct: 50, blocks: [{ type: 'text', content: { html: paragraph }, settings: {} }] },
                 ]
               },
@@ -196,7 +262,14 @@ async function mapRiseItem(
           return {
             type: 'image',
             position: 0,
-            content: { src: r2Key, alt: '', caption, alignment: 'center', size: 'large' },
+            content: {
+              src: r2Key, alt: '', caption, alignment: 'center', size: 'large',
+              riseVariant: variant,
+              backgroundColor: resolvedBg,
+              borderRadius: '0.5rem',
+              paddingTop, paddingBottom,
+              zoomOnClick,
+            },
             settings: {},
           }
         }

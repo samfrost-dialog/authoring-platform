@@ -12,8 +12,9 @@ type C = Record<string, any>
 
 type BlockTheme = { primary: string; accent: string; text: string; bg: string; headingFont: string; bodyFont: string; btnRadius?: string }
 
-function ZoomableImage({ src, alt, caption, alignment, size, textColor }: { src: string; alt: string; caption: string; alignment: string; size: string; textColor: string }) {
+function ZoomableImage({ src, alt, caption, alignment, size, textColor, borderRadius, zoom = true }: { src: string; alt: string; caption: string; alignment: string; size: string; textColor: string; borderRadius?: string; zoom?: boolean }) {
   const [zoomed, setZoomed] = useState(false)
+  const radius = borderRadius !== undefined ? borderRadius : '0.75rem'
   const alignClass = alignment === 'center' ? 'mx-auto text-center' : alignment === 'right' ? 'ml-auto' : ''
   const sizeClass = size === 'small' ? 'max-w-xs' : size === 'medium' ? 'max-w-md' : size === 'full' ? 'w-full' : 'max-w-3xl'
   return (
@@ -21,8 +22,9 @@ function ZoomableImage({ src, alt, caption, alignment, size, textColor }: { src:
       <figure className={`${alignClass} ${sizeClass}`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src} alt={alt}
-          className="rounded-xl w-full shadow-sm cursor-zoom-in hover:opacity-95 transition-opacity"
-          onClick={() => setZoomed(true)} />
+          className="w-full shadow-sm hover:opacity-95 transition-opacity"
+          style={{ borderRadius: radius, cursor: zoom ? 'zoom-in' : 'default' }}
+          onClick={() => zoom && setZoomed(true)} />
         {caption && <figcaption className="text-sm mt-2 text-center" style={{ color: `${textColor}60` }}>{caption}</figcaption>}
       </figure>
       {zoomed && (
@@ -59,28 +61,87 @@ export default function PreviewBlockRenderer({ block, theme, courseId }: { block
 function BlockContent({ block, c, t, courseId }: { block: Block; c: C; t: BlockTheme; courseId?: string }) {
   switch (block.type) {
 
-    case 'text':
+    case 'text': {
       if (!c.html) return null
+      const bgColor = c.backgroundColor as string | undefined
+      const resolvedBg = bgColor === '__accent__' ? t.accent : bgColor || undefined
+      const textColor = resolvedBg && resolvedBg !== 'transparent' ? '#fff' : t.text
+      const textWidth = c.textWidth as number | undefined
+      const maxW = textWidth ? `${textWidth}%` : '100%'
+      if (resolvedBg) {
+        return (
+          <div style={{ backgroundColor: resolvedBg, margin: '0 calc(-2rem)', padding: '3rem 2rem' }}>
+            <div className="rise-content" style={{ color: textColor, fontFamily: `'${t.bodyFont}', sans-serif`, maxWidth: maxW, margin: '0 auto' }}
+              dangerouslySetInnerHTML={{ __html: c.html }} />
+          </div>
+        )
+      }
       return (
-        <div
-          className="max-w-none leading-relaxed rise-content"
-          style={{ color: t.text, fontFamily: `'${t.bodyFont}', sans-serif` }}
-          dangerouslySetInnerHTML={{ __html: c.html }}
-        />
+        <div className="rise-content" style={{ color: textColor, fontFamily: `'${t.bodyFont}', sans-serif`, maxWidth: maxW, margin: '0 auto' }}
+          dangerouslySetInnerHTML={{ __html: c.html }} />
       )
+    }
 
     case 'image': {
       const imgUrl = c.publicUrl || c.src
       if (!imgUrl) return (
         <div className="h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-sm">No image</div>
       )
-      // Strip HTML tags for plain caption
       const caption = c.caption ? String(c.caption).replace(/<[^>]*>/g, '').trim() : ''
-      return <ZoomableImage src={String(imgUrl)} alt={String(c.alt || '')} caption={caption} alignment={String(c.alignment || 'center')} size={String(c.size || 'large')} textColor={t.text} />
+      const radius = c.borderRadius !== undefined ? String(c.borderRadius) : '0.75rem'
+      const variant = c.riseVariant as string | undefined
+      const bgColor = c.backgroundColor as string | undefined
+      const resolvedBg = bgColor === '__accent__' ? t.accent : bgColor || undefined
+      const ptRem = ((c.paddingTop as number) || 0) * 0.5
+      const pbRem = ((c.paddingBottom as number) || 0) * 0.5
+
+      // text overlay — full width image with text overlaid on top
+      if (variant === 'text overlay') {
+        const overlayText = c.overlayText as string | undefined
+        const overlayOpacity = parseFloat(String(c.overlayOpacity || 0.1))
+        const overlayColor = c.overlayColor as string || '#000000'
+        return (
+          <div style={{ position: 'relative', margin: '0 calc(-2rem)', backgroundColor: resolvedBg, paddingTop: `${ptRem}rem`, paddingBottom: `${pbRem}rem` }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={String(imgUrl)} alt={String(c.alt || '')} style={{ width: '100%', display: 'block', borderRadius: 0 }} />
+            {overlayOpacity > 0 && (
+              <div style={{ position: 'absolute', inset: 0, backgroundColor: overlayColor, opacity: overlayOpacity }} />
+            )}
+            {overlayText && (
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: '2rem 3rem' }}>
+                <div className="rise-content" style={{ color: '#fff', maxWidth: '50%' }} dangerouslySetInnerHTML={{ __html: overlayText }} />
+              </div>
+            )}
+          </div>
+        )
+      }
+
+      // hero — full width with caption below, section background color
+      if (variant === 'hero') {
+        return (
+          <div style={{ margin: '0 calc(-2rem)', backgroundColor: resolvedBg, paddingTop: `${ptRem}rem`, paddingBottom: `${pbRem}rem` }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={String(imgUrl)} alt={String(c.alt || '')} style={{ width: '100%', display: 'block', borderRadius: 0 }} />
+            {caption && (
+              <div className="rise-content" style={{ padding: '1.5rem 2rem', color: resolvedBg && resolvedBg !== 'transparent' ? '#fff' : t.text, textAlign: 'center' }}
+                dangerouslySetInnerHTML={{ __html: String(c.caption || caption) }} />
+            )}
+          </div>
+        )
+      }
+
+      // standard image
+      return (
+        <div style={{ backgroundColor: resolvedBg, paddingTop: resolvedBg ? `${ptRem + 1}rem` : 0, paddingBottom: resolvedBg ? `${pbRem + 1}rem` : 0, margin: resolvedBg ? '0 calc(-2rem)' : 0, padding: resolvedBg ? `${ptRem + 1}rem 2rem` : 0 }}>
+          <ZoomableImage src={String(imgUrl)} alt={String(c.alt || '')} caption={caption} alignment={String(c.alignment || 'center')} size={String(c.size || 'large')} textColor={resolvedBg ? '#fff' : t.text} borderRadius={radius} zoom={!!c.zoomOnClick} />
+        </div>
+      )
     }
 
     case 'video': {
       const vidUrl = c.publicUrl || c.src
+      const posterUrl = c.posterPublicUrl || c.poster
+      const radius = c.borderRadius !== undefined ? String(c.borderRadius) : '0.75rem'
       if (!vidUrl) return (
         <div className="h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-sm">No video</div>
       )
@@ -88,9 +149,18 @@ function BlockContent({ block, c, t, courseId }: { block: Block; c: C; t: BlockT
         const src = c.type === 'youtube'
           ? String(vidUrl).replace('watch?v=', 'embed/')
           : String(vidUrl).replace('vimeo.com/', 'player.vimeo.com/video/')
-        return <div className="aspect-video rounded-xl overflow-hidden shadow-sm"><iframe src={src} className="w-full h-full" allowFullScreen /></div>
+        return <div className="aspect-video overflow-hidden" style={{ borderRadius: radius }}><iframe src={src} className="w-full h-full" allowFullScreen /></div>
       }
-      return <video src={String(vidUrl)} controls={c.controls !== false} autoPlay={!!c.autoPlay} className="w-full rounded-xl shadow-sm" />
+      return (
+        <video
+          src={String(vidUrl)}
+          poster={posterUrl ? String(posterUrl) : undefined}
+          controls={c.controls !== false}
+          autoPlay={!!c.autoPlay}
+          className="w-full"
+          style={{ borderRadius: radius, display: 'block' }}
+        />
+      )
     }
 
     case 'audio':
@@ -261,21 +331,27 @@ function BlockContent({ block, c, t, courseId }: { block: Block; c: C; t: BlockT
 
     case 'columns': {
       const cols = (c.columns as Array<{ widthPct: number; blocks: Array<{ type: string; content: Record<string, unknown>; settings: Record<string, unknown> }> }>) || []
+      const bgColor = c.backgroundColor as string | undefined
+      const resolvedBg = bgColor === '__accent__' ? t.accent : bgColor || undefined
+      const ptRem = ((c.paddingTop as number) || 0) * 0.5
+      const pbRem = ((c.paddingBottom as number) || 0) * 0.5
       return (
-        <div className="flex gap-6 items-start flex-wrap md:flex-nowrap">
-          {cols.map((col, i) => (
-            <div key={i} style={{ flex: `0 0 calc(${col.widthPct}% - 0.75rem)`, minWidth: '200px' }}>
-              {(col.blocks || []).map((b, j) => (
-                <BlockContent
-                  key={j}
-                  block={{ id: `col-${i}-${j}`, lesson_id: '', type: b.type, position: j, content: b.content, settings: b.settings, created_at: '' }}
-                  c={b.content as C}
-                  t={t}
-                  courseId={courseId}
-                />
-              ))}
-            </div>
-          ))}
+        <div style={{ backgroundColor: resolvedBg, margin: resolvedBg ? '0 calc(-2rem)' : 0, padding: resolvedBg ? `${Math.max(ptRem,1)}rem 2rem ${Math.max(pbRem,1)}rem` : 0 }}>
+          <div className="flex gap-6 items-start flex-wrap md:flex-nowrap">
+            {cols.map((col, i) => (
+              <div key={i} style={{ flex: `0 0 calc(${col.widthPct}% - 0.75rem)`, minWidth: '200px' }}>
+                {(col.blocks || []).map((b, j) => (
+                  <BlockContent
+                    key={j}
+                    block={{ id: `col-${i}-${j}`, lesson_id: '', type: b.type, position: j, content: b.content, settings: b.settings, created_at: '' }}
+                    c={b.content as C}
+                    t={t}
+                    courseId={courseId}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
       )
     }

@@ -104,6 +104,10 @@ export async function POST(request: Request) {
           out.publicUrl = keyMap[out.publicUrl]
           out.src = out.publicUrl
         }
+        // Rewrite poster field (video thumbnails)
+        if (out.poster && typeof out.poster === 'string' && keyMap[out.poster]) {
+          out.posterPublicUrl = keyMap[out.poster]
+        }
         // Recurse into columns
         if (Array.isArray(out.columns)) {
           out.columns = (out.columns as Array<{ widthPct: number; blocks: Array<{ type: string; content: Record<string, unknown>; settings: Record<string, unknown> }> }>).map((col) => ({
