@@ -328,10 +328,12 @@ function ColumnsInspector({ block, onUpdateContent }: { block: Block; onUpdateCo
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cols = (block.content?.columns as any[]) || []
 
-  function updateColText(colIndex: number, blockIndex: number, html: string) {
+  function updateBlock(colIndex: number, blockIndex: number, updates: Record<string, unknown>) {
     const newCols = cols.map((col: { widthPct: number; blocks: Array<{ type: string; content: Record<string, unknown>; settings: Record<string, unknown> }> }, ci: number) =>
       ci === colIndex
-        ? { ...col, blocks: col.blocks.map((b, bi: number) => bi === blockIndex ? { ...b, content: { ...b.content, html } } : b) }
+        ? { ...col, blocks: col.blocks.map((b: { type: string; content: Record<string, unknown>; settings: Record<string, unknown> }, bi: number) =>
+            bi === blockIndex ? { ...b, content: { ...b.content, ...updates } } : b
+          )}
         : col
     )
     onUpdateContent({ ...block.content, columns: newCols })
@@ -341,32 +343,52 @@ function ColumnsInspector({ block, onUpdateContent }: { block: Block; onUpdateCo
     <div className="space-y-4">
       <p className="text-[#666] text-xs">{cols.length} column{cols.length !== 1 ? 's' : ''}</p>
       {cols.map((col: { widthPct: number; blocks: Array<{ type: string; content: Record<string, unknown>; settings: Record<string, unknown> }> }, ci: number) => (
-        <div key={ci} className="border border-[#2A2A2E] rounded-xl p-3 space-y-3">
-          <p className="text-[#555] text-[10px] uppercase tracking-wider">Column {ci + 1} · {col.widthPct}%</p>
-          {(col.blocks || []).map((b, bi: number) => (
-            <div key={bi}>
-              <p className="text-[#555] text-[10px] mb-1.5 capitalize">{b.type.replace(/_/g, ' ')}</p>
-              {b.type === 'text' && (
-                <textarea
-                  value={typeof b.content?.html === 'string' ? b.content.html.replace(/<[^>]*>/g, '') : ''}
-                  onChange={(e) => updateColText(ci, bi, `<p>${e.target.value}</p>`)}
-                  rows={4}
-                  placeholder="Text content…"
-                  className="w-full bg-[#0F0F10] border border-[#2A2A2E] rounded-lg px-3 py-2 text-white text-xs placeholder:text-[#444] focus:outline-none focus:border-indigo-500 transition-colors resize-none"
-                />
-              )}
-              {b.type === 'image' && (
-                <div className="flex items-center gap-2 bg-[#0F0F10] border border-[#2A2A2E] rounded-lg px-3 py-2">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[#555] flex-shrink-0">
-                    <rect x="1" y="1" width="10" height="10" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-                    <circle cx="4" cy="4" r="1" stroke="currentColor" strokeWidth="1.2"/>
-                    <path d="M1 8l3-3 2 2 2-2 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  <span className="text-[#666] text-xs truncate">{b.content?.publicUrl ? 'Image set' : 'No image'}</span>
-                </div>
-              )}
-            </div>
-          ))}
+        <div key={ci} className="border border-[#2A2A2E] rounded-xl overflow-hidden">
+          <div className="px-3 py-2 bg-[#141416] border-b border-[#2A2A2E]">
+            <p className="text-[#555] text-[10px] uppercase tracking-wider">Column {ci + 1} · {col.widthPct}%</p>
+          </div>
+          <div className="p-3 space-y-3">
+            {(col.blocks || []).map((b: { type: string; content: Record<string, unknown>; settings: Record<string, unknown> }, bi: number) => (
+              <div key={bi} className="space-y-2">
+                <p className="text-[#555] text-[10px] uppercase tracking-wider">{b.type.replace(/_/g, ' ')}</p>
+                {b.type === 'image' && (
+                  <div className="space-y-2">
+                    {b.content?.publicUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={b.content.publicUrl as string} alt="" className="w-full rounded-lg object-cover max-h-40" />
+                    ) : (
+                      <div className="h-24 bg-[#0F0F10] border border-[#2A2A2E] rounded-lg flex items-center justify-center text-[#444] text-xs">No image</div>
+                    )}
+                    <div>
+                      <p className="text-[10px] text-[#555] mb-1">Alt text</p>
+                      <input type="text" value={(b.content?.alt as string) || ''} placeholder="Alt text…"
+                        onChange={(e) => updateBlock(ci, bi, { alt: e.target.value })}
+                        className="w-full bg-[#0F0F10] border border-[#2A2A2E] rounded-lg px-3 py-1.5 text-white text-xs placeholder:text-[#444] focus:outline-none focus:border-indigo-500 transition-colors" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-[#555] mb-1">Caption</p>
+                      <input type="text" value={(b.content?.caption as string) || ''} placeholder="Caption…"
+                        onChange={(e) => updateBlock(ci, bi, { caption: e.target.value })}
+                        className="w-full bg-[#0F0F10] border border-[#2A2A2E] rounded-lg px-3 py-1.5 text-white text-xs placeholder:text-[#444] focus:outline-none focus:border-indigo-500 transition-colors" />
+                    </div>
+                  </div>
+                )}
+                {b.type === 'text' && (
+                  <div>
+                    <p className="text-[10px] text-[#555] mb-1">Content</p>
+                    <textarea
+                      value={typeof b.content?.html === 'string' ? b.content.html.replace(/<[^>]*>/g, '') : ''}
+                      onChange={(e) => updateBlock(ci, bi, { html: `<p style="font-size: 3.6rem; color: #2580cc; font-weight: bold;">${e.target.value}</p>` })}
+                      rows={5}
+                      placeholder="Text content…"
+                      className="w-full bg-[#0F0F10] border border-[#2A2A2E] rounded-lg px-3 py-2 text-white text-xs placeholder:text-[#444] focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+                    />
+                    <p className="text-[#444] text-[10px] mt-1">For rich text editing, use a standalone text block instead</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       ))}
     </div>
