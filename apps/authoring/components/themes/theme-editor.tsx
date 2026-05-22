@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { Theme } from './theme-types'
 import FontPicker from './font-picker'
+import CssEditor from './css-editor'
 import { DEFAULT_THEME } from './theme-types'
 import ThemePreview from './theme-preview'
 
@@ -169,6 +170,10 @@ export default function ThemeEditor({ theme, onSave, onCancel }: Props) {
                 { value: 'solid', label: 'Solid colour' },
                 { value: 'image', label: 'Image' },
               ]} />
+          </Section>
+
+          <Section title="Custom CSS">
+            <CssEditor value={data.custom_css || ''} onChange={(v) => set('custom_css', v)} />
           </Section>
         </div>
       </div>
