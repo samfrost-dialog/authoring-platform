@@ -22,6 +22,12 @@ export default function ScormImporter() {
       return
     }
 
+    if (file.size > 4 * 1024 * 1024) {
+      const sizeMB = (file.size / 1024 / 1024).toFixed(1)
+      setState({ phase: 'error', message: `File is ${sizeMB}MB — Vercel limits uploads to 4MB. Reduce your SCORM package size by compressing media files, or host videos externally (YouTube/Vimeo) and re-export from Rise.` })
+      return
+    }
+
     setState({ phase: 'uploading', progress: 0 })
 
     const formData = new FormData()

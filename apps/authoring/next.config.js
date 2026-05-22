@@ -9,8 +9,22 @@ const nextConfig = {
       },
     ],
   },
-  // In Next.js 16, serverComponentsExternalPackages moved to serverExternalPackages
   serverExternalPackages: ['jszip', 'node-html-parser'],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '50mb',
+    },
+  },
+  async headers() {
+    return [
+      {
+        source: '/api/import/:path*',
+        headers: [
+          { key: 'x-vercel-body-size-limit', value: '52428800' }, // 50MB
+        ],
+      },
+    ]
+  },
 }
 
 module.exports = nextConfig

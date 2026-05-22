@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server'
 import { createServerClient, createAdminClient } from '@/lib/db/server'
 import { parseScormPackage } from '@/lib/scorm/import/parser'
 
-export const maxDuration = 60 // seconds — parsing large ZIPs can take time
+export const maxDuration = 60
+export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic'
+
+// Increase Vercel body size limit to 50MB for SCORM ZIP uploads
+export async function generateStaticParams() { return [] }
 
 export async function POST(request: Request) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,8 +31,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'File must be a .zip package' }, { status: 400 })
     }
 
-    if (file.size > 500 * 1024 * 1024) {
-      return NextResponse.json({ error: 'File too large (max 500MB)' }, { status: 400 })
+    if (file.size > 4 * 1024 * 1024) {
+      return NextResponse.json({ 
+        error: 'File too large for direct upload (max 4MB). For larger packages, use the R2 staged upload endpoint.' 
+      }, { status: 413 })
     }
 
     // Parse the SCORM package
