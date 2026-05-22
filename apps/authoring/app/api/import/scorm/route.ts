@@ -4,10 +4,6 @@ import { parseScormPackage } from '@/lib/scorm/import/parser'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
-export const dynamic = 'force-dynamic'
-
-// Increase Vercel body size limit to 50MB for SCORM ZIP uploads
-export async function generateStaticParams() { return [] }
 
 export async function POST(request: Request) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
