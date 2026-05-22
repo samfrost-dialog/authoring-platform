@@ -12,6 +12,37 @@ type C = Record<string, any>
 
 type BlockTheme = { primary: string; accent: string; text: string; bg: string; headingFont: string; bodyFont: string; btnRadius?: string }
 
+function ZoomableImage({ src, alt, caption, alignment, size, textColor }: { src: string; alt: string; caption: string; alignment: string; size: string; textColor: string }) {
+  const [zoomed, setZoomed] = useState(false)
+  const alignClass = alignment === 'center' ? 'mx-auto text-center' : alignment === 'right' ? 'ml-auto' : ''
+  const sizeClass = size === 'small' ? 'max-w-xs' : size === 'medium' ? 'max-w-md' : size === 'full' ? 'w-full' : 'max-w-3xl'
+  return (
+    <>
+      <figure className={`${alignClass} ${sizeClass}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={alt}
+          className="rounded-xl w-full shadow-sm cursor-zoom-in hover:opacity-95 transition-opacity"
+          onClick={() => setZoomed(true)} />
+        {caption && <figcaption className="text-sm mt-2 text-center" style={{ color: `${textColor}60` }}>{caption}</figcaption>}
+      </figure>
+      {zoomed && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8"
+          style={{ backgroundColor: 'rgba(0,0,0,0.9)' }} onClick={() => setZoomed(false)}>
+          <button className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={src} alt={alt} className="max-w-full max-h-full rounded-lg shadow-2xl cursor-zoom-out"
+            onClick={(e) => e.stopPropagation()} />
+          {caption && <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/70 text-sm">{caption}</p>}
+        </div>
+      )}
+    </>
+  )
+}
+
 export default function PreviewBlockRenderer({ block, theme, courseId }: { block: Block; theme?: BlockTheme; courseId?: string }) {
   const t = theme ?? { primary: '#4F46E5', accent: '#06B6D4', text: '#111827', bg: '#FFFFFF', headingFont: 'Inter', bodyFont: 'Inter' }
   const c: C = block.content || {}
@@ -43,19 +74,9 @@ function BlockContent({ block, c, t, courseId }: { block: Block; c: C; t: BlockT
       if (!imgUrl) return (
         <div className="h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-sm">No image</div>
       )
-      const caption = c.caption ? String(c.caption).replace(/<[^>]*>/g, '') : ''
-      return (
-        <figure className={`${c.alignment === 'center' ? 'mx-auto text-center' : c.alignment === 'right' ? 'ml-auto' : ''} ${
-          c.size === 'small' ? 'max-w-xs' : c.size === 'medium' ? 'max-w-md' : c.size === 'full' ? 'w-full' : 'max-w-3xl'
-        }`}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={String(imgUrl)} alt={String(c.alt || '')} className="rounded-xl w-full shadow-sm" />
-          {caption && <figcaption className="text-sm mt-2 text-center" style={{ color: `${t.text}60` }}>{caption}</figcaption>}
-          {c.caption && typeof c.caption === 'string' && c.caption.includes('<') && (
-            <div className="prose prose-sm max-w-none mt-2 text-center" dangerouslySetInnerHTML={{ __html: c.caption }} />
-          )}
-        </figure>
-      )
+      // Strip HTML tags for plain caption
+      const caption = c.caption ? String(c.caption).replace(/<[^>]*>/g, '').trim() : ''
+      return <ZoomableImage src={String(imgUrl)} alt={String(c.alt || '')} caption={caption} alignment={String(c.alignment || 'center')} size={String(c.size || 'large')} textColor={t.text} />
     }
 
     case 'video': {
