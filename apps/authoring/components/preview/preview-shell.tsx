@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { Course, Lesson, Block } from '@/components/editor/types'
+type Course = { id: string; title: string; description: string | null; status: string }
+type Lesson = { id: string; course_id: string; title: string; position: number; is_section_header: boolean; created_at: string }
+type Block = { id: string; lesson_id: string; type: string; position: number; content: Record<string, unknown>; settings: Record<string, unknown>; created_at: string }
 import PreviewBlockRenderer from './preview-block-renderer'
 
 interface Props {
