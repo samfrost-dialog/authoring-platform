@@ -74,15 +74,32 @@ export async function POST(request: Request) {
         }
       }
 
-      // Rewrite block content to use real R2 URLs
-      const blocks = lesson.blocks.map((block) => {
-        const content = { ...block.content }
-        if (content.src && typeof content.src === 'string' && keyMap[content.src as string]) {
-          content.src = keyMap[content.src as string]
-          content.publicUrl = content.src
+      // Rewrite block content to use real R2 URLs (including nested blocks inside columns)
+      function rewriteContent(c: Record<string, unknown>): Record<string, unknown> {
+        const out = { ...c }
+        // Rewrite src/publicUrl at this level
+        if (out.src && typeof out.src === 'string' && keyMap[out.src]) {
+          out.publicUrl = keyMap[out.src]
+          out.src = out.publicUrl
         }
-        return { ...block, content }
-      })
+        if (out.publicUrl && typeof out.publicUrl === 'string' && keyMap[out.publicUrl]) {
+          out.publicUrl = keyMap[out.publicUrl]
+          out.src = out.publicUrl
+        }
+        // Recurse into columns
+        if (Array.isArray(out.columns)) {
+          out.columns = (out.columns as Array<{ widthPct: number; blocks: Array<{ type: string; content: Record<string, unknown>; settings: Record<string, unknown> }> }>).map((col) => ({
+            ...col,
+            blocks: (col.blocks || []).map((b) => ({ ...b, content: rewriteContent(b.content) })),
+          }))
+        }
+        return out
+      }
+
+      const blocks = lesson.blocks.map((block) => ({
+        ...block,
+        content: rewriteContent(block.content as Record<string, unknown>),
+      }))
 
       if (blocks.length > 0) {
         const { error: blocksError } = await adminSupabase
