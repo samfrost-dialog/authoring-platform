@@ -199,6 +199,7 @@ export default function EditorShell({ course, initialLessons, initialBlocks }: P
         {/* Right — block inspector */}
         <BlockInspector
           block={selectedBlock}
+          courseId={course.id}
           onUpdateContent={(content) =>
             selectedBlock && updateBlock(selectedBlock.id, content)
           }
