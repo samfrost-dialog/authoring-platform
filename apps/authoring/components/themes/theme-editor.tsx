@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { Theme } from './theme-types'
+import FontPicker from './font-picker'
 import { DEFAULT_THEME } from './theme-types'
 import ThemePreview from './theme-preview'
 
@@ -73,13 +74,6 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   )
 }
 
-const GOOGLE_FONTS = [
-  'Inter', 'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Raleway', 'Nunito',
-  'Poppins', 'Source Sans 3', 'Ubuntu', 'Playfair Display', 'Merriweather',
-  'Lora', 'PT Serif', 'Libre Baskerville', 'DM Sans', 'DM Serif Display',
-  'Space Grotesk', 'Outfit', 'Plus Jakarta Sans', 'Sora', 'Figtree',
-]
-
 // ── Main editor ───────────────────────────────────────────────────────────────
 
 export default function ThemeEditor({ theme, onSave, onCancel }: Props) {
@@ -115,8 +109,6 @@ export default function ThemeEditor({ theme, onSave, onCancel }: Props) {
     setSaving(false)
   }
 
-  const fontOptions = GOOGLE_FONTS.map((f) => ({ value: f, label: f }))
-
   return (
     <div className="flex gap-6 h-[calc(100vh-10rem)]">
       {/* Settings panel */}
@@ -148,8 +140,8 @@ export default function ThemeEditor({ theme, onSave, onCancel }: Props) {
           </Section>
 
           <Section title="Typography">
-            <SelectField label="Heading font" value={data.heading_font || 'Inter'} onChange={(v) => set('heading_font', v)} options={fontOptions} />
-            <SelectField label="Body font" value={data.body_font || 'Inter'} onChange={(v) => set('body_font', v)} options={fontOptions} />
+            <FontPicker label="Heading font" value={data.heading_font || 'Inter'} onChange={(v) => set('heading_font', v)} />
+            <FontPicker label="Body font" value={data.body_font || 'Inter'} onChange={(v) => set('body_font', v)} />
           </Section>
 
           <Section title="Buttons">
