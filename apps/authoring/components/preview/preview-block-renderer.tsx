@@ -181,19 +181,29 @@ function RiseBlock({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
         )
       }
 
-      // ── hero (block-image--hero) — truly full width, no container padding ──
+      // ── hero (block-image--hero) — full width by default, respects size override ──
       if (variant === 'hero') {
+        const heroSize = (c.size as string) || 'full'
+        const isHeroFull = heroSize === 'full' || heroSize === 'large'
+
+        const heroSizeStyle: React.CSSProperties =
+          heroSize === 'small'  ? { maxWidth: '240px', margin: '0 auto' } :
+          heroSize === 'medium' ? { maxWidth: '480px', margin: '0 auto' } :
+          {}
+
         return (
           <>
             {lightbox && <Lightbox src={lightbox} onClose={() => setLightbox(null)} />}
             <div className={`block-image block-image--hero block-wrapper bg ${rangeClass} ${bgClass}`}
-              style={{ ...wrapperStyle, paddingTop: 0, paddingBottom: 0 }}>
+              style={{ ...wrapperStyle, ...(!isHeroFull ? {} : { paddingTop: 0, paddingBottom: 0 }) }}>
               <span></span>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img alt="" decoding="async" loading="lazy"
-                src={String(imgUrl)}
-                style={{ width: '100%', display: 'block', cursor: zoomable ? 'zoom-in' : 'default' }}
-                onClick={() => zoomable && setLightbox(String(imgUrl))} />
+              <div style={heroSizeStyle}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img alt="" decoding="async" loading="lazy"
+                  src={String(imgUrl)}
+                  style={{ width: '100%', display: 'block', cursor: zoomable ? 'zoom-in' : 'default' }}
+                  onClick={() => zoomable && setLightbox(String(imgUrl))} />
+              </div>
               {caption && (
                 <div style={{ padding: `${ptRem}rem 3rem ${pbRem}rem` }}>
                   <div className="block-image__caption brand--linkColor">
