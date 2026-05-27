@@ -138,10 +138,10 @@ function ImageInspector({ block, courseId, onUpdate }: IP) {
 
       {!['text overlay', 'text aside', 'hero'].includes(block.content?.riseVariant || '') && (
         <>
-          <Select label="Alignment" value={block.content?.alignment || 'center'} onChange={(v) => onUpdate({ ...block.content, alignment: v })}
+          <Select label="Alignment" value={String(block.content?.alignment || 'center')} onChange={(v) => onUpdate({ ...block.content, alignment: v })}
             options={[{ value: 'left', label: 'Left' }, { value: 'center', label: 'Center' }, { value: 'right', label: 'Right' }]} />
-          <Select label="Size" value={block.content?.size || 'large'} onChange={(v) => onUpdate({ ...block.content, size: v })}
-            options={[{ value: 'small', label: 'Small' }, { value: 'medium', label: 'Medium' }, { value: 'large', label: 'Large' }, { value: 'full', label: 'Full width' }]} />
+          <Select label="Size" value={String(block.content?.size || 'large')} onChange={(v) => onUpdate({ ...block.content, size: v })}
+            options={[{ value: 'small', label: 'Small (240px)' }, { value: 'medium', label: 'Medium (480px)' }, { value: 'large', label: 'Large' }, { value: 'full', label: 'Full width' }]} />
         </>
       )}
     </div>

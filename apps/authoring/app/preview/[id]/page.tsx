@@ -3,6 +3,8 @@ import { createServerClient } from '@/lib/db/server'
 import PreviewShell from '@/components/preview/preview-shell'
 import { buildThemeCSS } from '@/lib/scorm/theme-resolver'
 
+export const dynamic = 'force-dynamic'
+
 export default async function PreviewPage({
   params,
   searchParams,
