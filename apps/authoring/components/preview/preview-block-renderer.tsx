@@ -159,30 +159,23 @@ function RiseBlock({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
           <>
             {lightbox && <Lightbox src={lightbox} onClose={() => setLightbox(null)} />}
             <div className={`block-image block-image--overlay block-image--flag-dimensions block-wrapper bg ${rangeClass} ${bgClass}`}
-              style={{ ...wrapperStyle, paddingTop: 0, paddingBottom: 0 }}>
+              style={{ ...wrapperStyle, paddingTop: 0, paddingBottom: 0, position: 'relative', overflow: 'hidden' }}>
               <span></span>
-              <div className="block-image__figure">
-                <div className="block-image__image"
-                  style={{ backgroundImage: `url("${imgUrl}")` }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img alt="" decoding="async" loading="lazy" src={String(imgUrl)}
-                    style={{ cursor: zoomable ? 'zoom-in' : 'default' }}
-                    onClick={() => zoomable && setLightbox(String(imgUrl))} />
-                  <div className="block-image__overlay"
-                    style={{ opacity: overlayOpacity, backgroundColor: overlayColor }} />
-                </div>
-                <div className="block-image__container">
-                  <div className="block-image__row">
-                    <div className="block-image__col">
-                      <div className="block-image__paragraph brand--linkColor">
-                        <div className="fr-view rise-tiptap">
-                          <div dangerouslySetInnerHTML={{ __html: paragraph || caption }} />
-                        </div>
-                      </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img alt="" decoding="async" loading="lazy" src={String(imgUrl)}
+                style={{ width: '100%', display: 'block', cursor: zoomable ? 'zoom-in' : 'default' }}
+                onClick={() => zoomable && setLightbox(String(imgUrl))} />
+              <div className="block-image__overlay"
+                style={{ position: 'absolute', inset: 0, backgroundColor: overlayColor, opacity: overlayOpacity, pointerEvents: 'none' }} />
+              {(paragraph || caption) && (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', padding: '0 3rem', maxWidth: '55%' }}>
+                  <div className="brand--linkColor">
+                    <div className="fr-view rise-tiptap">
+                      <div dangerouslySetInnerHTML={{ __html: paragraph || caption }} />
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </>
         )

@@ -107,11 +107,43 @@ function ImageInspector({ block, courseId, onUpdate }: IP) {
         onRemove={() => onUpdate({ ...block.content, src: undefined, publicUrl: undefined })}
       />
       <TextInput label="Alt text" value={block.content?.alt || ''} onChange={(v) => onUpdate({ ...block.content, alt: v })} placeholder="Describe the image" />
-      <TextInput label="Caption" value={block.content?.caption || ''} onChange={(v) => onUpdate({ ...block.content, caption: v })} placeholder="Optional caption" />
-      <Select label="Alignment" value={block.content?.alignment || 'center'} onChange={(v) => onUpdate({ ...block.content, alignment: v })}
-        options={[{ value: 'left', label: 'Left' }, { value: 'center', label: 'Center' }, { value: 'right', label: 'Right' }]} />
-      <Select label="Size" value={block.content?.size || 'large'} onChange={(v) => onUpdate({ ...block.content, size: v })}
-        options={[{ value: 'small', label: 'Small' }, { value: 'medium', label: 'Medium' }, { value: 'large', label: 'Large' }, { value: 'full', label: 'Full width' }]} />
+
+      {/* Text overlay variant — show text editor instead of caption */}
+      {block.content?.riseVariant === 'text overlay' ? (
+        <div className="space-y-1.5">
+          <p className="text-[#666] text-[10px] uppercase tracking-wider">Overlay text</p>
+          <textarea
+            value={typeof block.content?.caption === 'string' ? block.content.caption.replace(/<[^>]*>/g, '') : ''}
+            onChange={(e) => onUpdate({ ...block.content, caption: `<p>${e.target.value}</p>` })}
+            rows={4}
+            placeholder="Text displayed over the image…"
+            className="w-full bg-[#0F0F10] border border-[#2A2A2E] rounded-lg px-3 py-2 text-white text-xs placeholder:text-[#444] focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+          />
+          <p className="text-[#444] text-[10px]">Text appears on the left side of the image</p>
+        </div>
+      ) : block.content?.riseVariant === 'text aside' ? (
+        <div className="space-y-1.5">
+          <p className="text-[#666] text-[10px] uppercase tracking-wider">Side text</p>
+          <textarea
+            value={typeof block.content?.paragraph === 'string' ? block.content.paragraph.replace(/<[^>]*>/g, '') : ''}
+            onChange={(e) => onUpdate({ ...block.content, paragraph: `<p>${e.target.value}</p>` })}
+            rows={4}
+            placeholder="Text displayed beside the image…"
+            className="w-full bg-[#0F0F10] border border-[#2A2A2E] rounded-lg px-3 py-2 text-white text-xs placeholder:text-[#444] focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+          />
+        </div>
+      ) : (
+        <TextInput label="Caption" value={block.content?.caption || ''} onChange={(v) => onUpdate({ ...block.content, caption: v })} placeholder="Optional caption" />
+      )}
+
+      {!['text overlay', 'text aside', 'hero'].includes(block.content?.riseVariant || '') && (
+        <>
+          <Select label="Alignment" value={block.content?.alignment || 'center'} onChange={(v) => onUpdate({ ...block.content, alignment: v })}
+            options={[{ value: 'left', label: 'Left' }, { value: 'center', label: 'Center' }, { value: 'right', label: 'Right' }]} />
+          <Select label="Size" value={block.content?.size || 'large'} onChange={(v) => onUpdate({ ...block.content, size: v })}
+            options={[{ value: 'small', label: 'Small' }, { value: 'medium', label: 'Medium' }, { value: 'large', label: 'Large' }, { value: 'full', label: 'Full width' }]} />
+        </>
+      )}
     </div>
   )
 }
