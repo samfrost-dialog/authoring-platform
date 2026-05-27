@@ -4,6 +4,61 @@ import { fetchBuffer, deleteObject, importStagingKey, uploadBuffer } from '@/lib
 import JSZip from 'jszip'
 import { parse as parseHtml } from 'node-html-parser'
 
+// SCORM API stub injected into indexAPI.html at import time
+// Placed BEFORE scormdriver.js loads so the driver finds window.API immediately
+const SCORM_API_STUB = `
+<script>
+/* Injected SCORM 1.2 API stub - allows content to run outside an LMS */
+(function() {
+  var store = {
+    'cmi.core.student_name': 'Preview User',
+    'cmi.core.student_id': 'preview-user',
+    'cmi.core.lesson_status': 'incomplete',
+    'cmi.core.lesson_location': '',
+    'cmi.core.score.raw': '',
+    'cmi.core.score.min': '0',
+    'cmi.core.score.max': '100',
+    'cmi.core.credit': 'credit',
+    'cmi.core.entry': 'ab-initio',
+    'cmi.core.exit': '',
+    'cmi.core.session_time': '0000:00:00.00',
+    'cmi.suspend_data': '',
+    'cmi.student_data.mastery_score': '80',
+    'cmi.student_data.max_time_allowed': '',
+    'cmi.student_data.time_limit_action': '',
+    'cmi.launch_data': '',
+    'cmi.comments': '',
+    'cmi.comments_from_lms': ''
+  };
+  window.API = {
+    LMSInitialize: function(s) { return 'true'; },
+    LMSFinish: function(s) { return 'true'; },
+    LMSGetValue: function(e) { return store[e] !== undefined ? store[e] : ''; },
+    LMSSetValue: function(e, v) { store[e] = v; return 'true'; },
+    LMSCommit: function(s) { return 'true'; },
+    LMSGetLastError: function() { return '0'; },
+    LMSGetErrorString: function(e) { return ''; },
+    LMSGetDiagnostic: function(e) { return ''; }
+  };
+  // Also expose on parent chain in case driver walks up
+  try { if (window.parent && window.parent !== window) window.parent.API = window.API; } catch(e) {}
+  try { if (window.top && window.top !== window) window.top.API = window.API; } catch(e) {}
+})();
+</script>
+`
+
+function patchScormHtml(html: string): string {
+  // Inject API stub as the very first script in <head>
+  if (html.includes('<head>')) {
+    return html.replace('<head>', '<head>\n' + SCORM_API_STUB)
+  }
+  if (html.includes('<HEAD>')) {
+    return html.replace('<HEAD>', '<HEAD>\n' + SCORM_API_STUB)
+  }
+  // No head tag - prepend
+  return SCORM_API_STUB + html
+}
+
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
 
@@ -73,7 +128,16 @@ export async function POST(request: Request) {
     for (const [path, file] of Object.entries(zip.files)) {
       if (file.dir) continue
       try {
-        const fileData = Buffer.from(await file.async('arraybuffer'))
+        let fileData: Buffer
+        const isHtml = path.endsWith('.html') || path.endsWith('.htm')
+        if (isHtml) {
+          // Patch HTML files to inject SCORM API stub
+          const htmlContent = await file.async('string')
+          const patched = patchScormHtml(htmlContent)
+          fileData = Buffer.from(patched, 'utf-8')
+        } else {
+          fileData = Buffer.from(await file.async('arraybuffer'))
+        }
         const r2Key = `${r2Prefix}/${path}`
         const contentType = guessContentType(path)
         await uploadBuffer(r2Key, fileData, contentType)
