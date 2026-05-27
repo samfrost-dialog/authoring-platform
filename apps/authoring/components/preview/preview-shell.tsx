@@ -118,7 +118,7 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
       {riseCss && <style>{riseCss}</style>}
 
       {/* Rise base styles targeting Rise's actual class names */}
-      {isRiseCourse && <style dangerouslySetInnerHTML={{ __html: [
+      {isRiseCourse && <style>{[
         '.rise-lesson-content { font-size: 10px; }',
         '.rise-lesson-content *, .rise-lesson-content *::before, .rise-lesson-content *::after { box-sizing: border-box; }',
         '.rise-lesson-content .block-text__container { max-width: 102rem; margin: 0 auto; padding: 0 3rem; }',
@@ -153,8 +153,8 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
         '.rise-lesson-content .block-accordion__item { border-bottom: 1px solid rgba(128,128,128,0.3); }',
         '.rise-lesson-content .block-accordion__title { cursor: pointer; padding: 1.5rem 0; font-size: 1.7rem; font-weight: 600; list-style: none; display: flex; justify-content: space-between; align-items: center; }',
         '.rise-lesson-content .block-accordion__body { padding: 0 0 1.5rem; font-size: 1.7rem; line-height: 1.7; }',
-      ].join(' ') }} />
-      }
+      ].join(' ')}</style>}
+
 
       {/* Preview banner */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 text-xs text-white z-50" style={{ backgroundColor: '#1e1b4b', fontSize: '13px' }}>
