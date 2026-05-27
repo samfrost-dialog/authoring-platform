@@ -169,8 +169,8 @@ function RiseBlock({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
               <div className="block-image__overlay"
                 style={{ position: 'absolute', inset: 0, backgroundColor: overlayColor, opacity: overlayOpacity, pointerEvents: 'none' }} />
               {(paragraph || caption) && (
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', padding: '0 3rem', maxWidth: '55%' }}>
-                  <div className="brand--linkColor">
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', padding: '0 30px', maxWidth: '55%' }}>
+                  <div className="rise-lesson-content brand--linkColor" style={{ fontSize: '62.5%', width: '100%' }}>
                     <div className="fr-view rise-tiptap">
                       <div dangerouslySetInnerHTML={{ __html: paragraph || caption }} />
                     </div>
@@ -252,7 +252,7 @@ function RiseBlock({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
                   </div>
                   {/* Text column */}
                   <div className="block-image__col">
-                    <div className="block-image__text brand--linkColor">
+                    <div className="block-image__text brand--linkColor rise-lesson-content" style={{ fontSize: '62.5%' }}>
                       <div className="fr-view rise-tiptap">
                         <div dangerouslySetInnerHTML={{ __html: paragraph }} />
                       </div>
