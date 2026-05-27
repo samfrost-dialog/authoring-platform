@@ -22,7 +22,6 @@ export default async function PreviewPage({
     .from('courses').select('*').eq('id', id).is('deleted_at', null).single()
   if (!course) notFound()
 
-  // Fetch theme — course theme overrides org theme
   let theme = null
   if (course.theme_id) {
     const { data } = await supabase.from('themes').select('*').eq('id', course.theme_id).single()
