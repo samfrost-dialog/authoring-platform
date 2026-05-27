@@ -117,19 +117,44 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
       {riseMetadata && <style>{buildRiseCssVars(riseMetadata)}</style>}
       {riseCss && <style>{riseCss}</style>}
 
-      {/* Rise content: set 10px base so rem values match Rise's design system */}
-      {isRiseCourse && <style>{`
-        .rise-lesson-content { font-size: 10px; }
-        .rise-lesson-content * { box-sizing: border-box; }
-        .rise-lesson-content table { width: 100%; border-collapse: collapse; }
-        .rise-lesson-content th { background-color: var(--color-theme, #0076ce); color: #fff; padding: 17px 15px; font-weight: 700; text-align: left; border: 1px solid rgba(255,255,255,0.2); font-size: 1.4rem; }
-        .rise-lesson-content td { padding: 17px 15px; border: 1px solid #ddd; font-size: 1.4rem; vertical-align: middle; }
-        .rise-lesson-content tr:nth-child(even) td { background-color: #f5f5f5; }
-        .rise-lesson-content .rise-table-wrap { overflow-x: auto; }
-        .rise-lesson-content a { color: var(--color-theme, #0076ce); }
-        .rise-lesson-content p { margin-block-end: 1.7rem; }
-        .rise-lesson-content p:last-child { margin-block-end: 0; }
-      `}</style>}
+      {/* Rise base styles targeting Rise's actual class names */}
+      {isRiseCourse && <style dangerouslySetInnerHTML={{ __html: [
+        '.rise-lesson-content { font-size: 10px; }',
+        '.rise-lesson-content *, .rise-lesson-content *::before, .rise-lesson-content *::after { box-sizing: border-box; }',
+        '.rise-lesson-content .block-text__container { max-width: 102rem; margin: 0 auto; padding: 0 3rem; }',
+        '.rise-lesson-content .block-text__row { display: flex; }',
+        '.rise-lesson-content .block-text__col { flex: 1; min-width: 0; }',
+        '.rise-lesson-content .fr-view { font-size: 1.7rem; line-height: 1.94; }',
+        '.rise-lesson-content .fr-view p { margin-bottom: 1.7rem; }',
+        '.rise-lesson-content .fr-view p:last-child { margin-bottom: 0; }',
+        '.rise-lesson-content table.block-text__table { width: 100%; border-collapse: collapse; }',
+        `.rise-lesson-content .block-text__table th { background-color: ${riseMetadata?.accentColor || '#0076ce'}; color: #fff; padding: 17px 15px; font-weight: 700; text-align: left; border: 1px solid rgba(255,255,255,0.2); font-size: 1.4rem; }`,
+        '.rise-lesson-content .block-text__table td { padding: 17px 15px; border: 1px solid #ddd; font-size: 1.4rem; vertical-align: middle; }',
+        '.rise-lesson-content .block-text__table tr:nth-child(even) td { background-color: #f0f0f0; }',
+        '.rise-lesson-content .rise-table-wrap { overflow-x: auto; }',
+        '.rise-lesson-content .block-image__container { max-width: 102rem; margin: 0 auto; padding: 0 3rem; }',
+        '.rise-lesson-content .block-image__row { display: flex; gap: 3rem; align-items: flex-start; }',
+        '.rise-lesson-content .block-image__col { flex: 1; min-width: 0; }',
+        '.rise-lesson-content .block-image__image img { width: 100%; display: block; }',
+        '.rise-lesson-content .block-image__caption { font-size: 1.2rem; color: #6b7280; margin-top: 0.75rem; }',
+        '.rise-lesson-content .block-image__text { font-size: 1.7rem; line-height: 1.7; }',
+        '.rise-lesson-content .block-image__paragraph { font-size: 1.7rem; line-height: 1.7; }',
+        '.rise-lesson-content .block-image--overlay .block-image__figure { position: relative; }',
+        '.rise-lesson-content .block-image__overlay { position: absolute; inset: 0; pointer-events: none; }',
+        '.rise-lesson-content .block-image--overlay .block-image__container { position: absolute; inset: 0; max-width: none; display: flex; align-items: center; padding: 0 3rem; }',
+        '.rise-lesson-content .block-image--overlay .block-image__col { max-width: 50%; }',
+        '.rise-lesson-content .block-video__item--medium { max-width: 102rem; margin: 0 auto; }',
+        '.rise-lesson-content .block-video video { width: 100%; display: block; background: #000; }',
+        `.rise-lesson-content .brand--linkColor a { color: ${riseMetadata?.accentColor || '#0076ce'}; }`,
+        '.rise-lesson-content .bg--type-black { color: #fff; }',
+        '.rise-lesson-content .bg--type-accent { color: #fff; }',
+        '.rise-lesson-content .bg--type-light { color: #1f2937; }',
+        '.rise-lesson-content .block-accordion__container { max-width: 102rem; margin: 0 auto; padding: 0 3rem; }',
+        '.rise-lesson-content .block-accordion__item { border-bottom: 1px solid rgba(128,128,128,0.3); }',
+        '.rise-lesson-content .block-accordion__title { cursor: pointer; padding: 1.5rem 0; font-size: 1.7rem; font-weight: 600; list-style: none; display: flex; justify-content: space-between; align-items: center; }',
+        '.rise-lesson-content .block-accordion__body { padding: 0 0 1.5rem; font-size: 1.7rem; line-height: 1.7; }',
+      ].join(' ') }} />
+      }
 
       {/* Preview banner */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 text-xs text-white z-50" style={{ backgroundColor: '#1e1b4b', fontSize: '13px' }}>
