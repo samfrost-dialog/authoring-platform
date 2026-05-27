@@ -74,16 +74,17 @@ function RiseBlock({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
     bgClass === 'bg--type-accent' ? 'bg--range-med' :
     'bg--range-light'
 
-  const ptRem = ((c.paddingTop    as number) ?? 3) * 0.5
-  const pbRem = ((c.paddingBottom as number) ?? 3) * 0.5
+  // Rise padding: stored as units where 1 unit = 10px. Use px not rem to avoid base font-size issues.
+  const ptPx    = ((c.paddingTop    as number) ?? 3) * 10
+  const pbPx    = ((c.paddingBottom as number) ?? 3) * 10
 
   const wrapperStyle: React.CSSProperties = {
     ['--color-background' as string]: wrapperBg,
     ['--color-background-contrast' as string]: contrastColor,
     ['--color-background-contrast-complementary' as string]: contrastComplementary,
     boxShadow: `${wrapperBg} 0px 1px 0px`,
-    paddingTop: `${ptRem}rem`,
-    paddingBottom: `${pbRem}rem`,
+    paddingTop: `${ptPx}px`,
+    paddingBottom: `${pbPx}px`,
     backgroundColor: wrapperBg,
     color: contrastColor,
     fontFamily: `'${t.bodyFont}', sans-serif`,
@@ -205,7 +206,7 @@ function RiseBlock({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
                   onClick={() => zoomable && setLightbox(String(imgUrl))} />
               </div>
               {caption && (
-                <div style={{ padding: `${ptRem}rem 3rem ${pbRem}rem` }}>
+                <div style={{ padding: `${ptPx}px 30px ${pbPx}px` }}>
                   <div className="block-image__caption brand--linkColor">
                     <div className="fr-view rise-tiptap">
                       <div dangerouslySetInnerHTML={{ __html: caption }} />
