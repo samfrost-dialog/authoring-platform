@@ -357,13 +357,23 @@ function NativeBlock({ block, c, t, courseId }: { block: Block; c: C; t: BlockTh
       const imgUrl = c.publicUrl || c.src
       if (!imgUrl) return <div className="h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-sm">No image</div>
       const caption = c.caption ? String(c.caption).replace(/<[^>]*>/g, '').trim() : ''
+      const size = (c.size as string) || 'large'
+      const alignment = (c.alignment as string) || 'center'
+      const radius = c.borderRadius !== undefined ? String(c.borderRadius) : '0.75rem'
+
+      const wrapStyle: React.CSSProperties =
+        size === 'small'  ? { maxWidth: '240px', marginLeft: alignment === 'right' ? 'auto' : alignment === 'center' ? 'auto' : undefined, marginRight: alignment === 'left' ? undefined : 'auto' } :
+        size === 'medium' ? { maxWidth: '480px', marginLeft: alignment === 'center' || alignment === 'right' ? 'auto' : undefined, marginRight: alignment === 'center' || alignment === 'left' ? 'auto' : undefined } :
+        size === 'full'   ? { width: '100%' } :
+        { maxWidth: '100%', marginLeft: 'auto', marginRight: 'auto' }
+
       return (
         <>
           {lightbox && <Lightbox src={lightbox} onClose={() => setLightbox(null)} />}
-          <figure className="mx-auto max-w-3xl">
+          <figure style={wrapStyle}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={String(imgUrl)} alt={String(c.alt || '')} className="w-full rounded-xl shadow-sm block"
-              style={{ cursor: c.zoomOnClick ? 'zoom-in' : 'default' }}
+            <img src={String(imgUrl)} alt={String(c.alt || '')}
+              style={{ width: '100%', display: 'block', borderRadius: radius, cursor: c.zoomOnClick ? 'zoom-in' : 'default' }}
               onClick={() => c.zoomOnClick && setLightbox(String(imgUrl))} />
             {caption && <figcaption className="text-sm mt-2 text-center" style={{ color: `${t.text}60` }}>{caption}</figcaption>}
           </figure>

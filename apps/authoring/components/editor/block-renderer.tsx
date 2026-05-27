@@ -1,3 +1,4 @@
+import type React from 'react'
 import type { Block } from './types'
 
 const BLOCK_TYPE_LABELS: Record<string, string> = {
@@ -52,13 +53,34 @@ function TextBlock({ content }: { content: { html?: string } }) {
   )
 }
 
-function ImageBlock({ content }: { content: { alt?: string; caption?: string; publicUrl?: string; src?: string } }) {
+function ImageBlock({ content }: { content: { alt?: string; caption?: string; publicUrl?: string; src?: string; size?: string; alignment?: string; borderRadius?: string } }) {
   const url = content.publicUrl || content.src
+  const size = content.size || 'large'
+  const alignment = content.alignment || 'center'
+  const radius = content.borderRadius !== undefined ? content.borderRadius : '0.5rem'
+
+  const sizeStyle: React.CSSProperties =
+    size === 'small'  ? { maxWidth: '240px' } :
+    size === 'medium' ? { maxWidth: '480px' } :
+    size === 'full'   ? { width: '100%', margin: '0 calc(-1.5rem)' } :
+    { maxWidth: '100%' } // large
+
+  const alignStyle: React.CSSProperties =
+    alignment === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } :
+    alignment === 'right'  ? { marginLeft: 'auto' } :
+    {}
+
+  const wrapStyle: React.CSSProperties = size === 'full'
+    ? { ...sizeStyle }
+    : { ...sizeStyle, ...alignStyle }
+
   if (url && !url.startsWith('__import__')) {
     return (
       <div className="space-y-1">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={url} alt={content.alt || ''} className="w-full rounded-lg object-cover max-h-64" />
+        <div style={wrapStyle}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={url} alt={content.alt || ''} style={{ width: '100%', display: 'block', borderRadius: radius }} />
+        </div>
         {content.caption && <div className="text-[#666] text-xs text-center" dangerouslySetInnerHTML={{ __html: String(content.caption).replace(/<[^>]*>/g, '') }} />}
       </div>
     )
