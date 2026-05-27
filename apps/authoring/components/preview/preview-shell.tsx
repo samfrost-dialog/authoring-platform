@@ -234,14 +234,12 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
             <div style={{ paddingBottom: "120px" }}>
               {activeLesson && (
                 <>
-                  {/* Rise lesson header */}
-                  <div className="px-8 py-8 border-b" style={{ borderColor: `${text}10` }}>
-                    <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: primary }}>
-                      Lesson {activeIndex + 1} of {scos.length}
-                    </p>
-                    <h2 className="text-3xl font-bold" style={{ fontFamily: `'${headingFont}', sans-serif`, color: text }}>
+                  {/* Rise lesson header — matches Rise's lesson title style */}
+                  <div style={{ padding: '40px 30px 20px', borderBottom: `2px solid ${primary}`, marginBottom: 0 }}>
+                    <h2 style={{ fontFamily: `'${headingFont}', sans-serif`, fontSize: '32px', fontWeight: 700, color: text, margin: 0, lineHeight: 1.2 }}>
                       {activeLesson.title}
                     </h2>
+                    <div style={{ width: '80px', height: '3px', backgroundColor: primary, marginTop: '16px' }} />
                   </div>
 
                   {activeBlocks.length === 0 ? (
