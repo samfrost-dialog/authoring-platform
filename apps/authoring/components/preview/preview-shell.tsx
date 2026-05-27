@@ -111,14 +111,25 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
     .join('&')
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: bg, color: text, fontFamily: `'${bodyFont}', sans-serif` }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", backgroundColor: bg, color: text, fontFamily: `'${bodyFont}', sans-serif`, overflow: "hidden" }}>
       {/* Inject Rise CSS + theme variables */}
       {googleFonts && <style>{`@import url('https://fonts.googleapis.com/css2?${googleFonts}&display=swap');`}</style>}
       {riseMetadata && <style>{buildRiseCssVars(riseMetadata)}</style>}
       {riseCss && <style>{riseCss}</style>}
 
-      {/* Rise content uses font-size in rem based on 10px root — set base */}
-      {isRiseCourse && <style>{`html { font-size: 10px; } body { font-size: 1.7rem; }`}</style>}
+      {/* Rise content: set 10px base so rem values match Rise's design system */}
+      {isRiseCourse && <style>{`
+        .rise-lesson-content { font-size: 10px; }
+        .rise-lesson-content * { box-sizing: border-box; }
+        .rise-lesson-content table { width: 100%; border-collapse: collapse; }
+        .rise-lesson-content th { background-color: var(--color-theme, #0076ce); color: #fff; padding: 17px 15px; font-weight: 700; text-align: left; border: 1px solid rgba(255,255,255,0.2); font-size: 1.4rem; }
+        .rise-lesson-content td { padding: 17px 15px; border: 1px solid #ddd; font-size: 1.4rem; vertical-align: middle; }
+        .rise-lesson-content tr:nth-child(even) td { background-color: #f5f5f5; }
+        .rise-lesson-content .rise-table-wrap { overflow-x: auto; }
+        .rise-lesson-content a { color: var(--color-theme, #0076ce); }
+        .rise-lesson-content p { margin-block-end: 1.7rem; }
+        .rise-lesson-content p:last-child { margin-block-end: 0; }
+      `}</style>}
 
       {/* Preview banner */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 text-xs text-white z-50" style={{ backgroundColor: '#1e1b4b', fontSize: '13px' }}>
@@ -157,7 +168,7 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden relative">
+      <div style={{ display: "flex", flex: 1, minHeight: 0, position: "relative" }}>
         {sidebarOpen && (
           <div className="fixed inset-0 z-30 md:hidden" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
             onClick={() => setSidebarOpen(false)} />
@@ -192,10 +203,10 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
         </div>
 
         {/* Main content */}
-        <div className="flex-1 overflow-y-auto">
+        <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
           {/* For Rise courses: blocks are full-width sections, no max-width container */}
           {isRiseCourse ? (
-            <div className="pb-24">
+            <div style={{ paddingBottom: "120px" }}>
               {activeLesson && (
                 <>
                   {/* Rise lesson header */}
@@ -214,7 +225,7 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
                     </div>
                   ) : (
                     // Rise blocks: no spacing between — each block manages its own padding
-                    <div>
+                    <div className="rise-lesson-content">
                       {activeBlocks.map((block) => (
                         <PreviewBlockRenderer
                           key={block.id}
