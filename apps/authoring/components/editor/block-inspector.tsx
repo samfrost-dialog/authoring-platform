@@ -136,7 +136,7 @@ function ImageInspector({ block, courseId, onUpdate }: IP) {
         <TextInput label="Caption" value={(block.content?.caption || '').replace(/<[^>]*>/g, '')} onChange={(v) => onUpdate({ ...block.content, caption: v })} placeholder="Optional caption" />
       )}
 
-      {!['text overlay', 'text aside', 'hero'].includes(block.content?.riseVariant || '') && (
+      {!['text aside'].includes(block.content?.riseVariant || '') && (
         <>
           <Select label="Alignment" value={String(block.content?.alignment || 'center')} onChange={(v) => onUpdate({ ...block.content, alignment: v })}
             options={[{ value: 'left', label: 'Left' }, { value: 'center', label: 'Center' }, { value: 'right', label: 'Right' }]} />
