@@ -181,38 +181,28 @@ function RiseBlock({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
         )
       }
 
-      // ── hero (block-image--hero) ──────────────────────────────────────────
+      // ── hero (block-image--hero) — truly full width, no container padding ──
       if (variant === 'hero') {
         return (
           <>
             {lightbox && <Lightbox src={lightbox} onClose={() => setLightbox(null)} />}
-            <div className={`block-image block-image--hero block-image--flag-dimensions block-wrapper bg ${rangeClass} ${bgClass}`}
-              style={wrapperStyle}>
+            <div className={`block-image block-image--hero block-wrapper bg ${rangeClass} ${bgClass}`}
+              style={{ ...wrapperStyle, paddingTop: 0, paddingBottom: 0 }}>
               <span></span>
-              <div className="block-image__container">
-                <div className="block-image__row">
-                  <div className="block-image__col">
-                    <figure aria-labelledby={figureId} className="block-image__figure" role="figure">
-                      <div className="block-image__image">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img alt="" className="img-img img-img--center" decoding="async" loading="lazy"
-                          src={String(imgUrl)}
-                          style={{ width: '100%', display: 'block', cursor: zoomable ? 'zoom-in' : 'default' }}
-                          onClick={() => zoomable && setLightbox(String(imgUrl))} />
-                      </div>
-                      {caption && (
-                        <figcaption id={figureId}>
-                          <div className="block-image__caption brand--linkColor">
-                            <div className="fr-view rise-tiptap">
-                              <div dangerouslySetInnerHTML={{ __html: caption }} />
-                            </div>
-                          </div>
-                        </figcaption>
-                      )}
-                    </figure>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img alt="" decoding="async" loading="lazy"
+                src={String(imgUrl)}
+                style={{ width: '100%', display: 'block', cursor: zoomable ? 'zoom-in' : 'default' }}
+                onClick={() => zoomable && setLightbox(String(imgUrl))} />
+              {caption && (
+                <div style={{ padding: `${ptRem}rem 3rem ${pbRem}rem` }}>
+                  <div className="block-image__caption brand--linkColor">
+                    <div className="fr-view rise-tiptap">
+                      <div dangerouslySetInnerHTML={{ __html: caption }} />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </>
         )
@@ -265,35 +255,54 @@ function RiseBlock({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
       }
 
       // ── standard image ────────────────────────────────────────────────────
+      const isFullWidth = (c.size as string) === 'full'
       return (
         <>
           {lightbox && <Lightbox src={lightbox} onClose={() => setLightbox(null)} />}
-          <div className={`block-image block-wrapper bg ${rangeClass} ${bgClass}`} style={wrapperStyle}>
+          <div className={`block-image block-wrapper bg ${rangeClass} ${bgClass}`}
+            style={{ ...wrapperStyle, ...(isFullWidth ? { paddingLeft: 0, paddingRight: 0 } : {}) }}>
             <span></span>
-            <div className="block-image__container">
-              <div className="block-image__row">
-                <div className="block-image__col">
-                  <figure aria-labelledby={figureId} className="block-image__figure" role="figure">
-                    <div className="block-image__image">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img alt="" className="img-img img-img--center" decoding="async" loading="lazy"
-                        src={String(imgUrl)}
-                        style={{ width: '100%', display: 'block', cursor: zoomable ? 'zoom-in' : 'default' }}
-                        onClick={() => zoomable && setLightbox(String(imgUrl))} />
+            {isFullWidth ? (
+              // Full width — no container, image bleeds edge to edge
+              <div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img alt="" decoding="async" loading="lazy" src={String(imgUrl)}
+                  style={{ width: '100%', display: 'block', cursor: zoomable ? 'zoom-in' : 'default' }}
+                  onClick={() => zoomable && setLightbox(String(imgUrl))} />
+                {caption && (
+                  <div style={{ padding: '1rem 3rem' }}>
+                    <div className="block-image__caption brand--linkColor">
+                      <div className="fr-view rise-tiptap"><div dangerouslySetInnerHTML={{ __html: caption }} /></div>
                     </div>
-                    {caption && (
-                      <figcaption id={figureId}>
-                        <div className="block-image__caption brand--linkColor">
-                          <div className="fr-view rise-tiptap">
-                            <div dangerouslySetInnerHTML={{ __html: caption }} />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="block-image__container">
+                <div className="block-image__row">
+                  <div className="block-image__col">
+                    <figure aria-labelledby={figureId} className="block-image__figure" role="figure">
+                      <div className="block-image__image">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img alt="" className="img-img img-img--center" decoding="async" loading="lazy"
+                          src={String(imgUrl)}
+                          style={{ width: '100%', display: 'block', cursor: zoomable ? 'zoom-in' : 'default' }}
+                          onClick={() => zoomable && setLightbox(String(imgUrl))} />
+                      </div>
+                      {caption && (
+                        <figcaption id={figureId}>
+                          <div className="block-image__caption brand--linkColor">
+                            <div className="fr-view rise-tiptap">
+                              <div dangerouslySetInnerHTML={{ __html: caption }} />
+                            </div>
                           </div>
-                        </div>
-                      </figcaption>
-                    )}
-                  </figure>
+                        </figcaption>
+                      )}
+                    </figure>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </>
       )
