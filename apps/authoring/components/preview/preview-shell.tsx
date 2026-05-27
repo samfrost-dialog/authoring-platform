@@ -119,7 +119,7 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
 
       {/* Rise base styles targeting Rise's actual class names */}
       {isRiseCourse && <style>{[
-        '.rise-lesson-content { font-size: 10px; }',
+        '.rise-lesson-content { font-size: 62.5%; }', // makes 1rem = 10px to match Rise's base
         '.rise-lesson-content *, .rise-lesson-content *::before, .rise-lesson-content *::after { box-sizing: border-box; }',
         '.rise-lesson-content .block-text__container { max-width: 102rem; margin: 0 auto; padding: 0 3rem; }',
         '.rise-lesson-content .block-text__row { display: flex; }',
