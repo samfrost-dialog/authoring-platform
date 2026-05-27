@@ -73,6 +73,7 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
   const [activeLessonId, setActiveLessonId] = useState(initialLessonId)
   const [riseCss, setRiseCss] = useState<string>('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   // Extract Rise metadata from course
   const riseMetadata = (course.metadata?.riseMetadata as RiseMetadata | undefined)
@@ -200,31 +201,71 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
         )}
 
         {/* Sidebar */}
-        <div className={`fixed md:relative inset-y-0 left-0 z-40 md:z-auto w-72 md:w-64 flex-shrink-0 flex flex-col border-r overflow-y-auto transform transition-transform duration-200 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
-          style={{ backgroundColor: bg, borderColor: `${text}12`, top: 0 }}>
-          <div className="p-5 border-b flex-shrink-0" style={{ borderColor: `${text}10` }}>
-            <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: `${text}50` }}>Contents</p>
+        <div className={`fixed md:relative inset-y-0 left-0 z-40 md:z-auto flex-shrink-0 flex flex-col border-r overflow-hidden transform transition-all duration-200 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
+          style={{ backgroundColor: bg, borderColor: `${text}12`, top: 0, width: sidebarCollapsed ? '40px' : '256px', minWidth: sidebarCollapsed ? '40px' : '256px' }}>
+
+          {/* Collapse toggle */}
+          <div className="flex items-center justify-between flex-shrink-0 border-b" style={{ borderColor: `${text}10`, padding: sidebarCollapsed ? '14px 0' : '16px 20px', justifyContent: sidebarCollapsed ? 'center' : 'space-between' }}>
+            {!sidebarCollapsed && <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: `${text}50` }}>Contents</p>}
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="flex items-center justify-center rounded transition-colors hover:bg-black/10"
+              style={{ width: '24px', height: '24px', color: `${text}50`, flexShrink: 0 }}
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                {sidebarCollapsed
+                  ? <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  : <path d="M9 3L5 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                }
+              </svg>
+            </button>
           </div>
-          <nav className="flex-1 p-3 space-y-0.5">
-            {scos.map((lesson, i) => {
-              const isActive = lesson.id === activeLesson?.id
-              const isPast   = i < activeIndex
-              return (
-                <button key={lesson.id}
-                  onClick={() => { setActiveLessonId(lesson.id); setSidebarOpen(false) }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all text-sm"
-                  style={{ backgroundColor: isActive ? `${primary}12` : 'transparent', color: isActive ? primary : `${text}80` }}>
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium"
-                    style={{ backgroundColor: isActive ? primary : isPast ? '#10b981' : `${text}12`, color: (isActive || isPast) ? '#fff' : `${text}60` }}>
+
+          {/* Nav items — hidden when collapsed */}
+          {!sidebarCollapsed && (
+            <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+              {scos.map((lesson, i) => {
+                const isActive = lesson.id === activeLesson?.id
+                const isPast   = i < activeIndex
+                return (
+                  <button key={lesson.id}
+                    onClick={() => { setActiveLessonId(lesson.id); setSidebarOpen(false) }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all text-sm"
+                    style={{ backgroundColor: isActive ? `${primary}12` : 'transparent', color: isActive ? primary : `${text}80` }}>
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium"
+                      style={{ backgroundColor: isActive ? primary : isPast ? '#10b981' : `${text}12`, color: (isActive || isPast) ? '#fff' : `${text}60` }}>
+                      {isPast
+                        ? <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        : i + 1}
+                    </div>
+                    <span className="leading-snug truncate" style={{ fontWeight: isActive ? 500 : 400 }}>{lesson.title}</span>
+                  </button>
+                )
+              })}
+            </nav>
+          )}
+
+          {/* Collapsed state — show lesson numbers as dots */}
+          {sidebarCollapsed && (
+            <nav className="flex-1 py-3 flex flex-col items-center gap-2 overflow-y-auto">
+              {scos.map((lesson, i) => {
+                const isActive = lesson.id === activeLesson?.id
+                const isPast   = i < activeIndex
+                return (
+                  <button key={lesson.id}
+                    onClick={() => setActiveLessonId(lesson.id)}
+                    title={lesson.title}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-all"
+                    style={{ backgroundColor: isActive ? primary : isPast ? '#10b981' : `${text}12`, color: (isActive || isPast) ? '#fff' : `${text}40` }}>
                     {isPast
                       ? <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                       : i + 1}
-                  </div>
-                  <span className="leading-snug truncate" style={{ fontWeight: isActive ? 500 : 400 }}>{lesson.title}</span>
-                </button>
-              )
-            })}
-          </nav>
+                  </button>
+                )
+              })}
+            </nav>
+          )}
         </div>
 
         {/* Main content */}
