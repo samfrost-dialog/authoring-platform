@@ -111,7 +111,7 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
     .join('&')
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: bg, color: text, fontFamily: `'${bodyFont}', sans-serif` }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", backgroundColor: bg, color: text, fontFamily: `'${bodyFont}', sans-serif`, overflow: "hidden" }}>
       {/* Inject Rise CSS + theme variables */}
       {googleFonts && <style>{`@import url('https://fonts.googleapis.com/css2?${googleFonts}&display=swap');`}</style>}
       {riseMetadata && <style>{buildRiseCssVars(riseMetadata)}</style>}
@@ -168,7 +168,7 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
         </div>
       </div>
 
-      <div className="flex flex-1 relative" style={{ minHeight: 0 }}>
+      <div style={{ display: "flex", flex: 1, minHeight: 0, position: "relative" }}>
         {sidebarOpen && (
           <div className="fixed inset-0 z-30 md:hidden" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
             onClick={() => setSidebarOpen(false)} />
@@ -203,7 +203,7 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
         </div>
 
         {/* Main content */}
-        <div className="flex-1" style={{ overflowY: "auto", minHeight: 0 }}>
+        <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
           {/* For Rise courses: blocks are full-width sections, no max-width container */}
           {isRiseCourse ? (
             <div style={{ paddingBottom: "120px" }}>
