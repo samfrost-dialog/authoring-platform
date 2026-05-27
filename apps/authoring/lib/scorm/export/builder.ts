@@ -44,6 +44,14 @@ interface Theme {
   custom_css?: string | null
 }
 
+interface RiseMetadata {
+  accentColor: string
+  bodyTypeface: string
+  headingTypeface: string
+  uiTypeface: string
+  blockCorners: string
+}
+
 interface BuildOptions {
   course: Course
   lessons: Lesson[]
@@ -51,6 +59,7 @@ interface BuildOptions {
   theme: Theme | null
   orgSlug: string
   passingScore?: number
+  riseMetadata?: RiseMetadata | null
 }
 
 export async function buildScormPackage(opts: BuildOptions): Promise<Buffer> {
@@ -105,6 +114,7 @@ export async function buildScormPackage(opts: BuildOptions): Promise<Buffer> {
       courseTitle: course.title,
       passingScore,
       themeCSS,
+      riseMetadata: opts.riseMetadata || null,
     })
 
     const lessonFolder = lessonsFolder.folder(lesson.id)!

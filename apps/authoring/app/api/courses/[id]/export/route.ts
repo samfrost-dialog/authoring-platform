@@ -61,6 +61,8 @@ export async function POST(
     }
 
     // Build the SCORM package
+    const riseMetadata = course.metadata?.riseMetadata || null
+
     const zipBuffer = await buildScormPackage({
       course,
       lessons:     lessons ?? [],
@@ -68,6 +70,7 @@ export async function POST(
       theme,
       orgSlug,
       passingScore,
+      riseMetadata,
     })
 
     // Upload to R2
