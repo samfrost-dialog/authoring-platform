@@ -356,6 +356,28 @@ function BlockContent({ block, c, t, courseId }: { block: Block; c: C; t: BlockT
       )
     }
 
+    case 'raw_scorm': {
+      const launchUrl = c.baseUrl && c.launchFile
+        ? `${String(c.baseUrl)}${String(c.launchFile)}`
+        : null
+      if (!launchUrl) return (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-8 text-center text-gray-400 text-sm">
+          SCORM content URL not set
+        </div>
+      )
+      return (
+        <div style={{ margin: '0 calc(-2rem)' }}>
+          <iframe
+            src={launchUrl}
+            className="w-full border-0"
+            style={{ height: '100vh', minHeight: '600px' }}
+            allow="fullscreen"
+            title={String(c.itemTitle || c.courseTitle || 'Course content')}
+          />
+        </div>
+      )
+    }
+
     case 'raw_html':
       return <div dangerouslySetInnerHTML={{ __html: c.html || '' }} />
 

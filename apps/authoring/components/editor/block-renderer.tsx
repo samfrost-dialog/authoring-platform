@@ -252,6 +252,34 @@ export default function BlockRenderer({ block }: { block: Block }) {
     case 'quiz':           return <QuizBlock content={content} isKnowledgeCheck={false} />
     case 'knowledge_check': return <QuizBlock content={content} isKnowledgeCheck={true} />
     case 'button':         return <ButtonBlock content={content} />
+    case 'raw_scorm': {
+      const launchUrl = content.baseUrl && content.launchFile
+        ? `${String(content.baseUrl)}${String(content.launchFile)}`
+        : null
+      return (
+        <div className="border border-indigo-500/30 bg-indigo-500/5 rounded-xl overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-indigo-500/10 border-b border-indigo-500/20">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="1" y="1" width="10" height="10" rx="1.5" stroke="#818CF8" strokeWidth="1.2"/>
+              <path d="M4 4h4M4 6h4M4 8h2" stroke="#818CF8" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            <span className="text-indigo-400 text-xs font-medium">Original SCORM content</span>
+            {launchUrl && (
+              <a href={launchUrl} target="_blank" rel="noopener noreferrer"
+                className="ml-auto text-indigo-400/60 hover:text-indigo-400 text-xs transition-colors">
+                Open ↗
+              </a>
+            )}
+          </div>
+          {launchUrl ? (
+            <iframe src={launchUrl} className="w-full border-0" style={{ height: '400px' }} title="SCORM preview" />
+          ) : (
+            <div className="h-32 flex items-center justify-center text-[#555] text-xs">No launch URL configured</div>
+          )}
+        </div>
+      )
+    }
+
     case 'columns': {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cols = (content.columns as any[]) || []
