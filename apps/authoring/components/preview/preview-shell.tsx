@@ -168,7 +168,7 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex flex-1 relative" style={{ minHeight: 0 }}>
         {sidebarOpen && (
           <div className="fixed inset-0 z-30 md:hidden" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
             onClick={() => setSidebarOpen(false)} />
@@ -203,10 +203,10 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
         </div>
 
         {/* Main content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1" style={{ overflowY: "auto", minHeight: 0 }}>
           {/* For Rise courses: blocks are full-width sections, no max-width container */}
           {isRiseCourse ? (
-            <div className="pb-24">
+            <div style={{ paddingBottom: "120px" }}>
               {activeLesson && (
                 <>
                   {/* Rise lesson header */}
