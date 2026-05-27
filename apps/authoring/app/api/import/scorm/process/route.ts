@@ -1,63 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createServerClient, createAdminClient } from '@/lib/db/server'
-import { fetchBuffer, deleteObject, importStagingKey, uploadBuffer } from '@/lib/r2/client'
+import { parseScormPackage } from '@/lib/scorm/import/parser'
+import { fetchBuffer, deleteObject, importStagingKey, uploadBuffer, mediaKey } from '@/lib/r2/client'
+import type { RiseMetadata } from '@/lib/scorm/import/parser'
 import JSZip from 'jszip'
-import { parse as parseHtml } from 'node-html-parser'
-
-// SCORM API stub injected into indexAPI.html at import time
-// Placed BEFORE scormdriver.js loads so the driver finds window.API immediately
-const SCORM_API_STUB = `
-<script>
-/* Injected SCORM 1.2 API stub - allows content to run outside an LMS */
-(function() {
-  var store = {
-    'cmi.core.student_name': 'Preview User',
-    'cmi.core.student_id': 'preview-user',
-    'cmi.core.lesson_status': 'incomplete',
-    'cmi.core.lesson_location': '',
-    'cmi.core.score.raw': '',
-    'cmi.core.score.min': '0',
-    'cmi.core.score.max': '100',
-    'cmi.core.credit': 'credit',
-    'cmi.core.entry': 'ab-initio',
-    'cmi.core.exit': '',
-    'cmi.core.session_time': '0000:00:00.00',
-    'cmi.suspend_data': '',
-    'cmi.student_data.mastery_score': '80',
-    'cmi.student_data.max_time_allowed': '',
-    'cmi.student_data.time_limit_action': '',
-    'cmi.launch_data': '',
-    'cmi.comments': '',
-    'cmi.comments_from_lms': ''
-  };
-  window.API = {
-    LMSInitialize: function(s) { return 'true'; },
-    LMSFinish: function(s) { return 'true'; },
-    LMSGetValue: function(e) { return store[e] !== undefined ? store[e] : ''; },
-    LMSSetValue: function(e, v) { store[e] = v; return 'true'; },
-    LMSCommit: function(s) { return 'true'; },
-    LMSGetLastError: function() { return '0'; },
-    LMSGetErrorString: function(e) { return ''; },
-    LMSGetDiagnostic: function(e) { return ''; }
-  };
-  // Also expose on parent chain in case driver walks up
-  try { if (window.parent && window.parent !== window) window.parent.API = window.API; } catch(e) {}
-  try { if (window.top && window.top !== window) window.top.API = window.API; } catch(e) {}
-})();
-</script>
-`
-
-function patchScormHtml(html: string): string {
-  // Inject API stub as the very first script in <head>
-  if (html.includes('<head>')) {
-    return html.replace('<head>', '<head>\n' + SCORM_API_STUB)
-  }
-  if (html.includes('<HEAD>')) {
-    return html.replace('<HEAD>', '<HEAD>\n' + SCORM_API_STUB)
-  }
-  // No head tag - prepend
-  return SCORM_API_STUB + html
-}
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -81,26 +27,32 @@ export async function POST(request: Request) {
 
   try {
     const buffer = await fetchBuffer(stagingKey)
-    const zip = await JSZip.loadAsync(buffer)
-    const warnings: string[] = []
 
-    // ── Read manifest to get course title and lessons ─────────────────────
-    const manifestFile = zip.file('imsmanifest.xml')
-    if (!manifestFile) throw new Error('No imsmanifest.xml found')
+    // Extract Rise CSS bundle for faithful rendering
+    let riseCssKey: string | null = null
+    try {
+      const zip = await JSZip.loadAsync(buffer)
+      // Find the largest CSS file — that's Rise's main stylesheet
+      // Find largest Rise CSS file by reading each one
+      const cssFiles = Object.entries(zip.files)
+        .filter(([p]) => p.includes('lib/rise') && p.endsWith('.css'))
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .sort(([,a], [,b]) => ((b as any)._data?.uncompressedSize || 0) - ((a as any)._data?.uncompressedSize || 0))
 
-    const manifestXml = await manifestFile.async('string')
-    const manifest = parseHtml(manifestXml, { lowerCaseTagName: true })
+      if (cssFiles.length > 0) {
+        const [cssPath, cssFile] = cssFiles[0]
+        const cssData = Buffer.from(await (cssFile as JSZip.JSZipObject).async('arraybuffer'))
+        const cssR2Key = `rise-css/${orgUser.org_id}/rise-blocks.css`
+        await uploadBuffer(cssR2Key, cssData, 'text/css')
+        riseCssKey = cssR2Key
+      }
+    } catch { /* CSS extraction failed, continue */ }
 
-    const orgTitle = manifest.querySelector('organization > title')
-    const courseTitle = orgTitle?.text?.trim() || 'Imported Course'
-    const items = manifest.querySelectorAll('item[identifierref]')
+    const { courseTitle, lessons, warnings, riseMetadata } = await parseScormPackage(buffer)
 
-    // ── Upload ALL ZIP files to R2 under scorm-content/{courseId}/ ────────
-    // We store the entire scormcontent folder so we can serve it faithfully
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const adminSupabase = await createAdminClient() as any
 
-    // Create course first so we have the ID for R2 paths
     let course
     if (mode === 'into_course' && targetCourseId) {
       const { data } = await adminSupabase.from('courses').select('*').eq('id', targetCourseId).single()
@@ -113,42 +65,18 @@ export async function POST(request: Request) {
           org_id: orgUser.org_id,
           created_by: session.user.id,
           status: 'draft',
-          metadata: { importedFrom: 'scorm', importedAt: new Date().toISOString(), preservedOriginal: true },
+          metadata: {
+            importedFrom: 'scorm',
+            importedAt: new Date().toISOString(),
+            riseMetadata,
+            riseCssKey,
+          },
         })
         .select().single()
       if (courseError) throw courseError
       course = data
     }
 
-    // Upload every file from the ZIP to R2 under scorm-content/{courseId}/
-    const r2Prefix = `scorm-content/${course.id}`
-    const publicDomain = process.env.R2_PUBLIC_DOMAIN || ''
-    let uploadedCount = 0
-
-    for (const [path, file] of Object.entries(zip.files)) {
-      if (file.dir) continue
-      try {
-        let fileData: Buffer
-        const isHtml = path.endsWith('.html') || path.endsWith('.htm')
-        if (isHtml) {
-          // Patch HTML files to inject SCORM API stub
-          const htmlContent = await file.async('string')
-          const patched = patchScormHtml(htmlContent)
-          fileData = Buffer.from(patched, 'utf-8')
-        } else {
-          fileData = Buffer.from(await file.async('arraybuffer'))
-        }
-        const r2Key = `${r2Prefix}/${path}`
-        const contentType = guessContentType(path)
-        await uploadBuffer(r2Key, fileData, contentType)
-        uploadedCount++
-      } catch {
-        warnings.push(`Failed to upload: ${path}`)
-      }
-    }
-
-    // ── Create one lesson per SCO item ────────────────────────────────────
-    // Find existing lesson count for positioning
     let positionOffset = 0
     if (mode === 'into_course' && targetCourseId) {
       const { data: existingLessons } = await adminSupabase
@@ -157,67 +85,65 @@ export async function POST(request: Request) {
       positionOffset = existingLessons?.[0]?.position != null ? existingLessons[0].position + 1 : 0
     }
 
-    let lessonCount = 0
-    let blockCount = 0
+    const publicDomain = process.env.R2_PUBLIC_DOMAIN || ''
 
-    if (items.length === 0) {
-      // Single lesson from whole package
-      const { data: lessonRow } = await adminSupabase
+    for (const lesson of lessons) {
+      const { data: lessonRow, error: lessonError } = await adminSupabase
         .from('lessons')
-        .insert({ course_id: course.id, title: courseTitle, position: positionOffset, is_section_header: false })
+        .insert({
+          course_id: course.id,
+          title: lesson.title,
+          position: lesson.position + positionOffset,
+          is_section_header: false,
+        })
         .select().single()
 
-      if (lessonRow) {
-        // Find the main launch file
-        const launchHref = findLaunchFile(zip)
-        await adminSupabase.from('blocks').insert({
-          lesson_id: lessonRow.id,
-          type: 'raw_scorm',
-          position: 0,
-          content: {
-            baseUrl: `${publicDomain}/${r2Prefix}/`,
-            launchFile: launchHref,
-            courseTitle,
-          },
-          settings: {},
-        })
-        lessonCount = 1
-        blockCount = 1
+      if (lessonError) { warnings.push(`Failed to create lesson: ${lessonError.message}`); continue }
+
+      // Upload media files and build keyMap
+      const keyMap: Record<string, string> = {}
+      for (const media of lesson.mediaFiles || []) {
+        try {
+          const r2Key = mediaKey(orgUser.org_id, course.id, media.key.split('/').pop()!)
+          await uploadBuffer(r2Key, media.data, media.contentType)
+          keyMap[media.key] = `${publicDomain}/${r2Key}`
+        } catch { warnings.push(`Failed to upload media: ${media.key}`) }
       }
-    } else {
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i]
-        const itemTitle = item.querySelector('title')?.text?.trim() || `Lesson ${i + 1}`
-        const identifierRef = item.getAttribute('identifierref') || ''
-        const resource = manifest.querySelector(`resource[identifier="${identifierRef}"]`)
-        const href = resource?.getAttribute('href') || ''
 
-        const { data: lessonRow } = await adminSupabase
-          .from('lessons')
-          .insert({
-            course_id: course.id,
-            title: itemTitle,
-            position: i + positionOffset,
-            is_section_header: false,
-          })
-          .select().single()
-
-        if (lessonRow && href) {
-          await adminSupabase.from('blocks').insert({
-            lesson_id: lessonRow.id,
-            type: 'raw_scorm',
-            position: 0,
-            content: {
-              baseUrl: `${publicDomain}/${r2Prefix}/`,
-              launchFile: href,
-              courseTitle,
-              itemTitle,
-            },
-            settings: {},
-          })
-          blockCount++
+      // Rewrite block content URLs recursively
+      function rewriteContent(c: Record<string, unknown>): Record<string, unknown> {
+        const out = { ...c }
+        if (out.src && typeof out.src === 'string' && keyMap[out.src]) {
+          out.publicUrl = keyMap[out.src]; out.src = out.publicUrl
         }
-        lessonCount++
+        if (out.poster && typeof out.poster === 'string' && keyMap[out.poster]) {
+          out.posterPublicUrl = keyMap[out.poster]
+        }
+        if (Array.isArray(out.columns)) {
+          out.columns = (out.columns as Array<{ widthPct: number; blocks: Array<{ type: string; content: Record<string, unknown>; settings: Record<string, unknown> }> }>).map((col) => ({
+            ...col,
+            blocks: (col.blocks || []).map((b) => ({ ...b, content: rewriteContent(b.content) })),
+          }))
+        }
+        return out
+      }
+
+      const blocks = lesson.blocks.map((block) => ({
+        ...block,
+        content: rewriteContent(block.content as Record<string, unknown>),
+      }))
+
+      if (blocks.length > 0) {
+        const { error: blocksError } = await adminSupabase
+          .from('blocks')
+          .insert(blocks.map((b) => ({
+            lesson_id: lessonRow.id,
+            type: b.type,
+            position: b.position,
+            content: b.content,
+            settings: b.settings,
+          })))
+        if (blocksError) warnings.push(`Failed to insert blocks: ${blocksError.message}`)
       }
     }
 
@@ -226,10 +152,10 @@ export async function POST(request: Request) {
     return NextResponse.json({
       courseId: course.id,
       courseTitle,
-      lessonCount,
-      blockCount,
-      uploadedFiles: uploadedCount,
+      lessonCount: lessons.length,
+      blockCount: lessons.reduce((sum, l) => sum + l.blocks.length, 0),
       warnings,
+      riseMetadata,
     })
 
   } catch (err) {
@@ -240,28 +166,4 @@ export async function POST(request: Request) {
       { status: 500 }
     )
   }
-}
-
-function findLaunchFile(zip: JSZip): string {
-  const htmlFiles = Object.keys(zip.files).filter((f) =>
-    (f.endsWith('.html') || f.endsWith('.htm')) && !zip.files[f].dir
-  )
-  // Prefer index.html at root or in scormcontent/
-  const preferred = htmlFiles.find((f) => f === 'index.html' || f === 'scormcontent/index.html')
-  return preferred || htmlFiles[0] || 'index.html'
-}
-
-function guessContentType(path: string): string {
-  const ext = path.split('.').pop()?.toLowerCase() || ''
-  const map: Record<string, string> = {
-    html: 'text/html', htm: 'text/html',
-    js: 'application/javascript', css: 'text/css',
-    json: 'application/json', xml: 'application/xml',
-    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
-    gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp',
-    mp4: 'video/mp4', webm: 'video/webm', mp3: 'audio/mpeg',
-    woff: 'font/woff', woff2: 'font/woff2', ttf: 'font/ttf',
-    pdf: 'application/pdf', zip: 'application/zip',
-  }
-  return map[ext] || 'application/octet-stream'
 }
