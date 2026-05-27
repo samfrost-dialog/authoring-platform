@@ -117,8 +117,19 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
       {riseMetadata && <style>{buildRiseCssVars(riseMetadata)}</style>}
       {riseCss && <style>{riseCss}</style>}
 
-      {/* Rise content uses font-size in rem based on 10px root — set base */}
-      {isRiseCourse && <style>{`html { font-size: 10px; } body { font-size: 1.7rem; }`}</style>}
+      {/* Rise content: set 10px base so rem values match Rise's design system */}
+      {isRiseCourse && <style>{`
+        .rise-lesson-content { font-size: 10px; }
+        .rise-lesson-content * { box-sizing: border-box; }
+        .rise-lesson-content table { width: 100%; border-collapse: collapse; }
+        .rise-lesson-content th { background-color: var(--color-theme, #0076ce); color: #fff; padding: 17px 15px; font-weight: 700; text-align: left; border: 1px solid rgba(255,255,255,0.2); font-size: 1.4rem; }
+        .rise-lesson-content td { padding: 17px 15px; border: 1px solid #ddd; font-size: 1.4rem; vertical-align: middle; }
+        .rise-lesson-content tr:nth-child(even) td { background-color: #f5f5f5; }
+        .rise-lesson-content .rise-table-wrap { overflow-x: auto; }
+        .rise-lesson-content a { color: var(--color-theme, #0076ce); }
+        .rise-lesson-content p { margin-block-end: 1.7rem; }
+        .rise-lesson-content p:last-child { margin-block-end: 0; }
+      `}</style>}
 
       {/* Preview banner */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 text-xs text-white z-50" style={{ backgroundColor: '#1e1b4b', fontSize: '13px' }}>
@@ -214,7 +225,7 @@ export default function PreviewShell({ course, lessons, blocks, activeLessonId: 
                     </div>
                   ) : (
                     // Rise blocks: no spacing between — each block manages its own padding
-                    <div>
+                    <div className="rise-lesson-content">
                       {activeBlocks.map((block) => (
                         <PreviewBlockRenderer
                           key={block.id}
