@@ -272,7 +272,12 @@ export default function BlockRenderer({ block }: { block: Block }) {
             )}
           </div>
           {launchUrl ? (
-            <iframe src={launchUrl} className="w-full border-0" style={{ height: '400px' }} title="SCORM preview" />
+            <iframe
+              srcDoc={`<!DOCTYPE html><html><head><script>window.API={LMSInitialize:function(){return'true'},LMSFinish:function(){return'true'},LMSGetValue:function(e){var d={'cmi.core.student_name':'Preview User','cmi.core.student_id':'preview','cmi.core.lesson_status':'incomplete','cmi.core.lesson_location':'','cmi.suspend_data':'','cmi.core.score.raw':'','cmi.core.score.min':'0','cmi.core.score.max':'100','cmi.core.credit':'credit','cmi.core.entry':'ab-initio','cmi.student_data.mastery_score':'80','cmi.launch_data':''};return d[e]!==undefined?d[e]:''},LMSSetValue:function(){return'true'},LMSCommit:function(){return'true'},LMSGetLastError:function(){return'0'},LMSGetErrorString:function(){return''},LMSGetDiagnostic:function(){return''}};window.location.replace(${JSON.stringify(launchUrl)});<\/script></head><body></body></html>`}
+              className="w-full border-0"
+              style={{ height: '400px' }}
+              title="SCORM preview"
+            />
           ) : (
             <div className="h-32 flex items-center justify-center text-[#555] text-xs">No launch URL configured</div>
           )}

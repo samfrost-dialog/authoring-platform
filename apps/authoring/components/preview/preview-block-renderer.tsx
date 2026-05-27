@@ -12,6 +12,89 @@ type C = Record<string, any>
 
 type BlockTheme = { primary: string; accent: string; text: string; bg: string; headingFont: string; bodyFont: string; btnRadius?: string }
 
+function ScormIframe({ baseUrl, launchFile, title }: { baseUrl: string; launchFile: string; title: string }) {
+  const launchUrl = baseUrl && launchFile ? `${baseUrl}${launchFile}` : null
+
+  // Inject SCORM API shim into window before iframe loads so Rise finds window.API
+  const injectScormApi = `
+    <script>
+      // SCORM 1.2 API stub — satisfies Rise's LMS API check
+      window.API = {
+        LMSInitialize: function() { return 'true'; },
+        LMSFinish: function() { return 'true'; },
+        LMSGetValue: function(e) {
+          if (e === 'cmi.core.student_name') return 'Preview User';
+          if (e === 'cmi.core.student_id') return 'preview';
+          if (e === 'cmi.core.lesson_status') return 'incomplete';
+          if (e === 'cmi.core.lesson_location') return '';
+          if (e === 'cmi.suspend_data') return '';
+          if (e === 'cmi.core.score.raw') return '';
+          return '';
+        },
+        LMSSetValue: function() { return 'true'; },
+        LMSCommit: function() { return 'true'; },
+        LMSGetLastError: function() { return '0'; },
+        LMSGetErrorString: function() { return ''; },
+        LMSGetDiagnostic: function() { return ''; }
+      };
+    </script>
+  `
+
+  if (!launchUrl) return (
+    <div className="bg-gray-50 border border-gray-200 rounded-xl p-8 text-center text-gray-400 text-sm">
+      SCORM content URL not set
+    </div>
+  )
+
+  // Use srcdoc to inject API stub before the real content loads via redirect
+  // We load a tiny bootstrap page that sets window.API then navigates to the real URL
+  const bootstrap = `<!DOCTYPE html>
+<html><head>
+<script>
+window.API = {
+  LMSInitialize: function() { return 'true'; },
+  LMSFinish: function() { return 'true'; },
+  LMSGetValue: function(e) {
+    var defaults = {
+      'cmi.core.student_name': 'Preview User',
+      'cmi.core.student_id': 'preview',
+      'cmi.core.lesson_status': 'incomplete',
+      'cmi.core.lesson_location': '',
+      'cmi.suspend_data': '',
+      'cmi.core.score.raw': '',
+      'cmi.core.score.min': '0',
+      'cmi.core.score.max': '100',
+      'cmi.core.credit': 'credit',
+      'cmi.core.entry': 'ab-initio',
+      'cmi.core.exit': '',
+      'cmi.student_data.mastery_score': '80',
+      'cmi.launch_data': ''
+    };
+    return defaults[e] !== undefined ? defaults[e] : '';
+  },
+  LMSSetValue: function() { return 'true'; },
+  LMSCommit: function() { return 'true'; },
+  LMSGetLastError: function() { return '0'; },
+  LMSGetErrorString: function() { return ''; },
+  LMSGetDiagnostic: function() { return ''; }
+};
+window.location.replace(${JSON.stringify(launchUrl)});
+</script>
+</head><body></body></html>`
+
+  return (
+    <div style={{ margin: '0 calc(-2rem)' }}>
+      <iframe
+        srcDoc={bootstrap}
+        className="w-full border-0"
+        style={{ height: '100vh', minHeight: '600px' }}
+        allow="fullscreen"
+        title={title}
+      />
+    </div>
+  )
+}
+
 function ZoomableImage({ src, alt, caption, alignment, size, textColor, borderRadius, zoom = true }: { src: string; alt: string; caption: string; alignment: string; size: string; textColor: string; borderRadius?: string; zoom?: boolean }) {
   const [zoomed, setZoomed] = useState(false)
   const radius = borderRadius !== undefined ? borderRadius : '0.75rem'
@@ -356,27 +439,8 @@ function BlockContent({ block, c, t, courseId }: { block: Block; c: C; t: BlockT
       )
     }
 
-    case 'raw_scorm': {
-      const launchUrl = c.baseUrl && c.launchFile
-        ? `${String(c.baseUrl)}${String(c.launchFile)}`
-        : null
-      if (!launchUrl) return (
-        <div className="bg-gray-50 border border-gray-200 rounded-xl p-8 text-center text-gray-400 text-sm">
-          SCORM content URL not set
-        </div>
-      )
-      return (
-        <div style={{ margin: '0 calc(-2rem)' }}>
-          <iframe
-            src={launchUrl}
-            className="w-full border-0"
-            style={{ height: '100vh', minHeight: '600px' }}
-            allow="fullscreen"
-            title={String(c.itemTitle || c.courseTitle || 'Course content')}
-          />
-        </div>
-      )
-    }
+    case 'raw_scorm':
+      return <ScormIframe baseUrl={String(c.baseUrl || '')} launchFile={String(c.launchFile || '')} title={String(c.itemTitle || c.courseTitle || 'Course content')} />
 
     case 'raw_html':
       return <div dangerouslySetInnerHTML={{ __html: c.html || '' }} />
