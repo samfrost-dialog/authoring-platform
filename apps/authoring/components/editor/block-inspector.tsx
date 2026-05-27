@@ -413,7 +413,7 @@ function SettingsPanel({ block, onUpdate }: { block: Block; onUpdate: (s: Record
 export default function BlockInspector({ block, courseId, onUpdateContent, onUpdateSettings }: Props) {
   if (!block) {
     return (
-      <div className="w-64 bg-[#111113] border-l border-[#1E1E22] flex items-center justify-center flex-shrink-0">
+      <div className="w-full bg-[#111113] border-l border-[#1E1E22] flex items-center justify-center flex-shrink-0">
         <p className="text-[#444] text-xs text-center px-4">Select a block to edit its settings</p>
       </div>
     )
@@ -448,7 +448,7 @@ export default function BlockInspector({ block, courseId, onUpdateContent, onUpd
   })()
 
   return (
-    <div className="w-64 bg-[#111113] border-l border-[#1E1E22] flex flex-col overflow-hidden flex-shrink-0">
+    <div className="w-full bg-[#111113] border-l border-[#1E1E22] flex flex-col overflow-hidden flex-shrink-0">
       <div className="px-4 py-3 border-b border-[#1E1E22]">
         <span className="text-[#666] text-xs font-medium uppercase tracking-wider">{block.type.replace(/_/g, ' ')}</span>
       </div>

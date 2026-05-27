@@ -178,7 +178,7 @@ export default function LessonOutline({
   }
 
   return (
-    <div className="w-52 flex flex-col bg-[#111113] border-r border-[#1E1E22] overflow-hidden flex-shrink-0">
+    <div className="w-full flex flex-col bg-[#111113] border-r border-[#1E1E22] overflow-hidden flex-shrink-0">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#1E1E22]">
         <span className="text-[#666] text-xs font-medium uppercase tracking-wider">Lessons</span>
