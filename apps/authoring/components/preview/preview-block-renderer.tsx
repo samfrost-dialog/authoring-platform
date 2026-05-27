@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 
 type BlockTheme = {
   primary: string; accent: string; text: string; bg: string
@@ -255,7 +255,20 @@ function RiseBlock({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
       }
 
       // ── standard image ────────────────────────────────────────────────────
-      const isFullWidth = (c.size as string) === 'full'
+      const imgSize = (c.size as string) || 'large'
+      const isFullWidth = imgSize === 'full'
+      const imgAlignment = (c.alignment as string) || 'center'
+
+      const sizeConstraint: React.CSSProperties =
+        imgSize === 'small'  ? { maxWidth: '240px' } :
+        imgSize === 'medium' ? { maxWidth: '480px' } :
+        {}
+
+      const alignConstraint: React.CSSProperties =
+        imgAlignment === 'left'   ? { marginLeft: 0, marginRight: 'auto' } :
+        imgAlignment === 'right'  ? { marginLeft: 'auto', marginRight: 0 } :
+        { marginLeft: 'auto', marginRight: 'auto' }
+
       return (
         <>
           {lightbox && <Lightbox src={lightbox} onClose={() => setLightbox(null)} />}
@@ -263,7 +276,6 @@ function RiseBlock({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
             style={{ ...wrapperStyle, ...(isFullWidth ? { paddingLeft: 0, paddingRight: 0 } : {}) }}>
             <span></span>
             {isFullWidth ? (
-              // Full width — no container, image bleeds edge to edge
               <div>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img alt="" decoding="async" loading="lazy" src={String(imgUrl)}
@@ -281,7 +293,8 @@ function RiseBlock({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
               <div className="block-image__container">
                 <div className="block-image__row">
                   <div className="block-image__col">
-                    <figure aria-labelledby={figureId} className="block-image__figure" role="figure">
+                    <figure className="block-image__figure" role="figure"
+                      style={{ ...sizeConstraint, ...alignConstraint }}>
                       <div className="block-image__image">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img alt="" className="img-img img-img--center" decoding="async" loading="lazy"
@@ -290,7 +303,7 @@ function RiseBlock({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
                           onClick={() => zoomable && setLightbox(String(imgUrl))} />
                       </div>
                       {caption && (
-                        <figcaption id={figureId}>
+                        <figcaption>
                           <div className="block-image__caption brand--linkColor">
                             <div className="fr-view rise-tiptap">
                               <div dangerouslySetInnerHTML={{ __html: caption }} />
