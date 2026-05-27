@@ -24,6 +24,8 @@ export default function EditorShell({ course, initialLessons, initialBlocks }: P
   )
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
+  const [leftWidth, setLeftWidth] = useState(208)
+  const [rightWidth, setRightWidth] = useState(256)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const supabase = createClient()
 
@@ -162,6 +164,38 @@ export default function EditorShell({ course, initialLessons, initialBlocks }: P
     .sort((a, b) => a.position - b.position)
   const selectedBlock = blocks.find((b) => b.id === selectedBlockId) ?? null
 
+  function startDragLeft(e: React.MouseEvent) {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = leftWidth
+    function onMove(ev: MouseEvent) {
+      const delta = ev.clientX - startX
+      setLeftWidth(Math.max(160, Math.min(400, startW + delta)))
+    }
+    function onUp() {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  function startDragRight(e: React.MouseEvent) {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = rightWidth
+    function onMove(ev: MouseEvent) {
+      const delta = startX - ev.clientX
+      setRightWidth(Math.max(200, Math.min(600, startW + delta)))
+    }
+    function onUp() {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
   return (
     <div className="h-screen flex flex-col bg-[#0F0F10] overflow-hidden">
       {/* Top toolbar */}
@@ -169,17 +203,27 @@ export default function EditorShell({ course, initialLessons, initialBlocks }: P
 
       {/* Three-panel layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left — lesson outline */}
-        <LessonOutline
-          lessons={lessons}
-          activeLessonId={activeLessonId}
-          blocks={blocks}
-          onSelectLesson={setActiveLessonId}
-          onAddLesson={addLesson}
-          onUpdateTitle={updateLessonTitle}
-          onDeleteLesson={deleteLesson}
-          onReorder={reorderLessons}
-        />
+        {/* Left — lesson outline with draggable right border */}
+        <div style={{ width: leftWidth, flexShrink: 0, position: 'relative' }} className="flex">
+          <div style={{ width: '100%' }} className="overflow-hidden">
+            <LessonOutline
+              lessons={lessons}
+              activeLessonId={activeLessonId}
+              blocks={blocks}
+              onSelectLesson={setActiveLessonId}
+              onAddLesson={addLesson}
+              onUpdateTitle={updateLessonTitle}
+              onDeleteLesson={deleteLesson}
+              onReorder={reorderLessons}
+            />
+          </div>
+          {/* Right drag handle */}
+          <div
+            onMouseDown={startDragLeft}
+            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-indigo-500/50 active:bg-indigo-500 transition-colors z-10"
+            style={{ userSelect: 'none' }}
+          />
+        </div>
 
         {/* Centre — block canvas */}
         <BlockCanvas
@@ -196,17 +240,27 @@ export default function EditorShell({ course, initialLessons, initialBlocks }: P
           }
         />
 
-        {/* Right — block inspector */}
-        <BlockInspector
-          block={selectedBlock}
-          courseId={course.id}
-          onUpdateContent={(content) =>
-            selectedBlock && updateBlock(selectedBlock.id, content)
-          }
-          onUpdateSettings={(settings) =>
-            selectedBlock && updateBlockSettings(selectedBlock.id, settings)
-          }
-        />
+        {/* Right — block inspector with draggable left border */}
+        <div style={{ width: rightWidth, flexShrink: 0, position: 'relative' }} className="flex">
+          {/* Left drag handle */}
+          <div
+            onMouseDown={startDragRight}
+            className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-indigo-500/50 active:bg-indigo-500 transition-colors z-10"
+            style={{ userSelect: 'none' }}
+          />
+          <div style={{ width: '100%' }} className="overflow-hidden">
+            <BlockInspector
+              block={selectedBlock}
+              courseId={course.id}
+              onUpdateContent={(content) =>
+                selectedBlock && updateBlock(selectedBlock.id, content)
+              }
+              onUpdateSettings={(settings) =>
+                selectedBlock && updateBlockSettings(selectedBlock.id, settings)
+              }
+            />
+          </div>
+        </div>
       </div>
     </div>
   )
