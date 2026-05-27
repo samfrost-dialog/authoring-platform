@@ -133,7 +133,7 @@ function ImageInspector({ block, courseId, onUpdate }: IP) {
           />
         </div>
       ) : (
-        <TextInput label="Caption" value={block.content?.caption || ''} onChange={(v) => onUpdate({ ...block.content, caption: v })} placeholder="Optional caption" />
+        <TextInput label="Caption" value={(block.content?.caption || '').replace(/<[^>]*>/g, '')} onChange={(v) => onUpdate({ ...block.content, caption: v })} placeholder="Optional caption" />
       )}
 
       {!['text overlay', 'text aside', 'hero'].includes(block.content?.riseVariant || '') && (
