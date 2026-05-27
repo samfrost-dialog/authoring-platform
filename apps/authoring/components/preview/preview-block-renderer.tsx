@@ -22,6 +22,8 @@ interface Props {
   isRiseCourse?: boolean
 }
 
+// ── Lightbox ──────────────────────────────────────────────────────────────────
+
 function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -38,54 +40,53 @@ function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
   )
 }
 
+// ── Main renderer ─────────────────────────────────────────────────────────────
+
 export default function PreviewBlockRenderer({ block, theme, courseId, isRiseCourse }: Props) {
   const c: C = block.content || {}
   const t = theme ?? { primary: '#0076ce', accent: '#0076ce', text: '#111827', bg: '#ffffff', headingFont: 'Roboto', bodyFont: 'Roboto' }
 
-  if (isRiseCourse) {
-    return <RiseBlock block={block} c={c} t={t} />
-  }
+  if (isRiseCourse) return <RiseBlock block={block} c={c} t={t} />
   return <NativeBlock block={block} c={c} t={t} courseId={courseId} />
 }
 
-// ── Rise-faithful renderer ────────────────────────────────────────────────────
-// Matches Rise's visual output using inline styles that replicate Rise's CSS
+// ── Rise-faithful renderer — uses Rise's exact class names and structure ───────
 
 function RiseBlock({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
   const [lightbox, setLightbox] = useState<string | null>(null)
 
-  const bgType  = c.bgClass as string || ''
+  // Resolve section wrapper classes and CSS vars exactly as Rise does
+  const bgClass = c.bgClass as string || 'bg--type-light'
   const bgColor = c.bgColor as string | undefined
-  const ptRem   = ((c.paddingTop    as number) ?? 3) * 0.5
-  const pbRem   = ((c.paddingBottom as number) ?? 3) * 0.5
 
-  // Section background
-  const sectionBg =
-    bgType === 'bg--type-black'  ? '#000000' :
-    bgType === 'bg--type-dark'   ? '#1a1a1a' :
-    bgType === 'bg--type-accent' ? t.primary :
-    bgType === 'bg--type-color' && bgColor ? bgColor :
-    'transparent'
-
-  const sectionTextColor =
-    sectionBg === 'transparent' || sectionBg === '#ffffff' ? '#1f2937' :
-    sectionBg === t.primary ? '#ffffff' :
+  const wrapperBg =
+    bgClass === 'bg--type-black'  ? '#000000' :
+    bgClass === 'bg--type-dark'   ? '#1a1a1a' :
+    bgClass === 'bg--type-accent' ? t.primary :
+    bgClass === 'bg--type-color' && bgColor ? bgColor :
     '#ffffff'
 
-  const sectionStyle: React.CSSProperties = {
-    backgroundColor: sectionBg === 'transparent' ? undefined : sectionBg,
-    color: sectionTextColor,
-    paddingTop: `${ptRem * 10}px`,
-    paddingBottom: `${pbRem * 10}px`,
-    fontFamily: `'${t.bodyFont}', sans-serif`,
-  }
+  const contrastColor = wrapperBg === '#ffffff' ? '#000' : '#fff'
+  const contrastComplementary = wrapperBg === '#ffffff' ? '#fff' : '#000'
 
-  // Max-width content container (Rise uses ~1020px max-width, 30px padding)
-  const innerStyle: React.CSSProperties = {
-    maxWidth: '1020px',
-    margin: '0 auto',
-    paddingLeft: '30px',
-    paddingRight: '30px',
+  const rangeClass =
+    bgClass === 'bg--type-black'  ? 'bg--range-near-black' :
+    bgClass === 'bg--type-accent' ? 'bg--range-med' :
+    'bg--range-light'
+
+  const ptRem = ((c.paddingTop    as number) ?? 3) * 0.5
+  const pbRem = ((c.paddingBottom as number) ?? 3) * 0.5
+
+  const wrapperStyle: React.CSSProperties = {
+    ['--color-background' as string]: wrapperBg,
+    ['--color-background-contrast' as string]: contrastColor,
+    ['--color-background-contrast-complementary' as string]: contrastComplementary,
+    boxShadow: `${wrapperBg} 0px 1px 0px`,
+    paddingTop: `${ptRem}rem`,
+    paddingBottom: `${pbRem}rem`,
+    backgroundColor: wrapperBg,
+    color: contrastColor,
+    fontFamily: `'${t.bodyFont}', sans-serif`,
   }
 
   switch (block.type) {
@@ -95,16 +96,22 @@ function RiseBlock({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
       const vidUrl    = c.publicUrl || c.src
       const posterUrl = c.posterPublicUrl || c.poster
       if (!vidUrl) return null
+
       return (
-        // Rise video: no horizontal padding, full container width
-        <div style={{ ...sectionStyle, paddingLeft: 0, paddingRight: 0 }}>
-          <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-            <video
-              src={String(vidUrl)}
-              poster={posterUrl ? String(posterUrl) : undefined}
-              controls
-              style={{ width: '100%', display: 'block', maxHeight: '620px', objectFit: 'contain', backgroundColor: '#000' }}
-            />
+        <div className={`block-video block-wrapper bg ${rangeClass} ${bgClass}`} style={wrapperStyle}>
+          <span></span>
+          <div className="block-video__item block-video__item--medium">
+            <figure>
+              <div className="video-container">
+                <video
+                  src={String(vidUrl)}
+                  poster={posterUrl ? String(posterUrl) : undefined}
+                  controls
+                  style={{ width: '100%', display: 'block', backgroundColor: '#000' }}
+                />
+              </div>
+              <figcaption className="block-video__wrapper"></figcaption>
+            </figure>
           </div>
         </div>
       )
@@ -112,34 +119,20 @@ function RiseBlock({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
 
     // ── Text ───────────────────────────────────────────────────────────────
     case 'text': {
-      const html      = c.html as string || ''
-      const variant   = c.riseVariant as string || ''
-      const textWidth = (c.textWidth as number) ?? 92
-      const isHeading = variant.includes('heading') || variant.includes('subheading')
-
-      // Strip Rise editor wrapper divs, preserve inner HTML with inline styles
-      const cleanHtml = stripEditorDivs(html)
+      const html = c.html as string || ''
+      if (!html.trim()) return null
 
       return (
-        <div style={sectionStyle}>
-          <div style={innerStyle}>
-            <div style={{ maxWidth: `${textWidth}%`, margin: '0 auto' }}>
-              {isHeading ? (
-                <div style={{
-                  fontFamily: `'${t.headingFont}', sans-serif`,
-                  fontSize: '2.8rem',
-                  fontWeight: 700,
-                  lineHeight: 1.25,
-                  color: sectionTextColor,
-                }} dangerouslySetInnerHTML={{ __html: cleanHtml }} />
-              ) : (
-                <div style={{
-                  fontFamily: `'${t.bodyFont}', sans-serif`,
-                  fontSize: '1.7rem',
-                  lineHeight: 1.94,
-                  color: sectionTextColor,
-                }} dangerouslySetInnerHTML={{ __html: cleanHtml }} />
-              )}
+        <div className={`block-text block-wrapper bg ${rangeClass} ${bgClass}`} style={wrapperStyle}>
+          <span></span>
+          <div className="block-text__container">
+            <div className="block-text__row"></div>
+            <div className="block-text__row">
+              <div className="block-text__col brand--linkColor">
+                <div className="fr-view rise-tiptap">
+                  <div dangerouslySetInnerHTML={{ __html: html }} />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -158,104 +151,155 @@ function RiseBlock({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
 
       if (!imgUrl) return null
 
-      // text overlay: full-width image, text overlaid on left side
+      const figureId = `figcaption-${block.id}`
+
+      // ── text overlay (block-image--overlay) ──────────────────────────────
       if (variant === 'text overlay') {
-        const cleanCaption = stripEditorDivs(caption)
         return (
           <>
             {lightbox && <Lightbox src={lightbox} onClose={() => setLightbox(null)} />}
-            <div style={{ ...sectionStyle, padding: 0, position: 'relative', overflow: 'hidden' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={String(imgUrl)} alt=""
-                style={{ width: '100%', display: 'block', cursor: zoomable ? 'zoom-in' : 'default' }}
-                onClick={() => zoomable && setLightbox(String(imgUrl))} />
-              {overlayOpacity > 0 && (
-                <div style={{ position: 'absolute', inset: 0, backgroundColor: overlayColor, opacity: overlayOpacity, pointerEvents: 'none' }} />
-              )}
-              {cleanCaption && (
-                <div style={{
-                  position: 'absolute', inset: 0,
-                  display: 'flex', alignItems: 'center',
-                  padding: '3rem',
-                  maxWidth: '50%',
-                }}>
-                  <div style={{ color: '#fff' }} dangerouslySetInnerHTML={{ __html: cleanCaption }} />
-                </div>
-              )}
-            </div>
-          </>
-        )
-      }
-
-      // hero: full-width image, caption below with section bg
-      if (variant === 'hero') {
-        const cleanCaption = stripEditorDivs(caption)
-        return (
-          <>
-            {lightbox && <Lightbox src={lightbox} onClose={() => setLightbox(null)} />}
-            <div style={sectionStyle}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={String(imgUrl)} alt=""
-                style={{ width: '100%', display: 'block', cursor: zoomable ? 'zoom-in' : 'default' }}
-                onClick={() => zoomable && setLightbox(String(imgUrl))} />
-              {cleanCaption && (
-                <div style={{
-                  ...innerStyle,
-                  paddingTop: '1.5rem',
-                  paddingBottom: '0.5rem',
-                  fontSize: '1.2rem',
-                  color: sectionTextColor,
-                  borderBottom: `1px solid ${sectionTextColor === '#ffffff' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.15)'}`,
-                }} dangerouslySetInnerHTML={{ __html: cleanCaption }} />
-              )}
-            </div>
-          </>
-        )
-      }
-
-      // text aside: image left (~50%), text right (~50%)
-      if (variant === 'text aside') {
-        const cleanParagraph = stripEditorDivs(paragraph)
-        const cleanCaption   = stripEditorDivs(caption)
-        const captionText    = cleanCaption.replace(/<[^>]*>/g, '').trim()
-        return (
-          <>
-            {lightbox && <Lightbox src={lightbox} onClose={() => setLightbox(null)} />}
-            <div style={sectionStyle}>
-              <div style={{ ...innerStyle, display: 'flex', gap: '3rem', alignItems: 'flex-start' }}>
-                <div style={{ flex: '0 0 calc(50% - 1.5rem)' }}>
+            <div className={`block-image block-image--overlay block-image--flag-dimensions block-wrapper bg ${rangeClass} ${bgClass}`}
+              style={{ ...wrapperStyle, paddingTop: 0, paddingBottom: 0 }}>
+              <span></span>
+              <div className="block-image__figure">
+                <div className="block-image__image"
+                  style={{ backgroundImage: `url("${imgUrl}")` }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={String(imgUrl)} alt=""
-                    style={{ width: '100%', display: 'block', cursor: zoomable ? 'zoom-in' : 'default' }}
+                  <img alt="" decoding="async" loading="lazy" src={String(imgUrl)}
+                    style={{ cursor: zoomable ? 'zoom-in' : 'default' }}
                     onClick={() => zoomable && setLightbox(String(imgUrl))} />
-                  {captionText && captionText !== 'Click on image to zoom in.' && (
-                    <p style={{ fontSize: '1.2rem', color: sectionTextColor === '#ffffff' ? 'rgba(255,255,255,0.6)' : '#6b7280', marginTop: '0.75rem' }}>
-                      {captionText}
-                    </p>
-                  )}
+                  <div className="block-image__overlay"
+                    style={{ opacity: overlayOpacity, backgroundColor: overlayColor }} />
                 </div>
-                <div style={{ flex: '1', color: sectionTextColor }} dangerouslySetInnerHTML={{ __html: cleanParagraph }} />
+                <div className="block-image__container">
+                  <div className="block-image__row">
+                    <div className="block-image__col">
+                      <div className="block-image__paragraph brand--linkColor">
+                        <div className="fr-view rise-tiptap">
+                          <div dangerouslySetInnerHTML={{ __html: paragraph || caption }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </>
         )
       }
 
-      // standard image
-      const cleanCaption = stripEditorDivs(caption)
+      // ── hero (block-image--hero) ──────────────────────────────────────────
+      if (variant === 'hero') {
+        return (
+          <>
+            {lightbox && <Lightbox src={lightbox} onClose={() => setLightbox(null)} />}
+            <div className={`block-image block-image--hero block-image--flag-dimensions block-wrapper bg ${rangeClass} ${bgClass}`}
+              style={wrapperStyle}>
+              <span></span>
+              <div className="block-image__container">
+                <div className="block-image__row">
+                  <div className="block-image__col">
+                    <figure aria-labelledby={figureId} className="block-image__figure" role="figure">
+                      <div className="block-image__image">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img alt="" className="img-img img-img--center" decoding="async" loading="lazy"
+                          src={String(imgUrl)}
+                          style={{ width: '100%', display: 'block', cursor: zoomable ? 'zoom-in' : 'default' }}
+                          onClick={() => zoomable && setLightbox(String(imgUrl))} />
+                      </div>
+                      {caption && (
+                        <figcaption id={figureId}>
+                          <div className="block-image__caption brand--linkColor">
+                            <div className="fr-view rise-tiptap">
+                              <div dangerouslySetInnerHTML={{ __html: caption }} />
+                            </div>
+                          </div>
+                        </figcaption>
+                      )}
+                    </figure>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )
+      }
+
+      // ── text aside (block-image--text-aside) ──────────────────────────────
+      if (variant === 'text aside') {
+        return (
+          <>
+            {lightbox && <Lightbox src={lightbox} onClose={() => setLightbox(null)} />}
+            <div className={`block-image block-image--text-aside block-wrapper bg ${rangeClass} ${bgClass}`}
+              style={wrapperStyle}>
+              <span></span>
+              <div className="block-image__container">
+                <div className="block-image__row">
+                  {/* Image column */}
+                  <div className="block-image__col">
+                    <figure aria-labelledby={figureId} className="block-image__figure" role="figure">
+                      <div className="block-image__image">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img alt="" className="img-img img-img--center" decoding="async" loading="lazy"
+                          src={String(imgUrl)}
+                          style={{ cursor: zoomable ? 'zoom-in' : 'default' }}
+                          onClick={() => zoomable && setLightbox(String(imgUrl))} />
+                      </div>
+                      {caption && (
+                        <figcaption id={figureId}>
+                          <div className="block-image__caption brand--linkColor">
+                            <div className="fr-view rise-tiptap">
+                              <div dangerouslySetInnerHTML={{ __html: caption }} />
+                            </div>
+                          </div>
+                        </figcaption>
+                      )}
+                    </figure>
+                  </div>
+                  {/* Text column */}
+                  <div className="block-image__col">
+                    <div className="block-image__text brand--linkColor">
+                      <div className="fr-view rise-tiptap">
+                        <div dangerouslySetInnerHTML={{ __html: paragraph }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )
+      }
+
+      // ── standard image ────────────────────────────────────────────────────
       return (
         <>
           {lightbox && <Lightbox src={lightbox} onClose={() => setLightbox(null)} />}
-          <div style={sectionStyle}>
-            <div style={innerStyle}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={String(imgUrl)} alt=""
-                style={{ width: '100%', display: 'block', cursor: zoomable ? 'zoom-in' : 'default' }}
-                onClick={() => zoomable && setLightbox(String(imgUrl))} />
-              {cleanCaption && (
-                <div style={{ fontSize: '1.2rem', color: '#6b7280', marginTop: '0.75rem', textAlign: 'center' }}
-                  dangerouslySetInnerHTML={{ __html: cleanCaption }} />
-              )}
+          <div className={`block-image block-wrapper bg ${rangeClass} ${bgClass}`} style={wrapperStyle}>
+            <span></span>
+            <div className="block-image__container">
+              <div className="block-image__row">
+                <div className="block-image__col">
+                  <figure aria-labelledby={figureId} className="block-image__figure" role="figure">
+                    <div className="block-image__image">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img alt="" className="img-img img-img--center" decoding="async" loading="lazy"
+                        src={String(imgUrl)}
+                        style={{ width: '100%', display: 'block', cursor: zoomable ? 'zoom-in' : 'default' }}
+                        onClick={() => zoomable && setLightbox(String(imgUrl))} />
+                    </div>
+                    {caption && (
+                      <figcaption id={figureId}>
+                        <div className="block-image__caption brand--linkColor">
+                          <div className="fr-view rise-tiptap">
+                            <div dangerouslySetInnerHTML={{ __html: caption }} />
+                          </div>
+                        </div>
+                      </figcaption>
+                    )}
+                  </figure>
+                </div>
+              </div>
             </div>
           </div>
         </>
@@ -266,16 +310,18 @@ function RiseBlock({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
     case 'accordion': {
       const items = (c.items as Array<{ id: string; title: string; bodyHtml: string }>) || []
       return (
-        <div style={sectionStyle}>
-          <div style={innerStyle}>
+        <div className={`block-accordion block-wrapper bg ${rangeClass} ${bgClass}`} style={wrapperStyle}>
+          <span></span>
+          <div className="block-accordion__container">
             {items.map((item) => (
-              <details key={item.id} style={{ borderBottom: `1px solid ${sectionTextColor === '#ffffff' ? 'rgba(255,255,255,0.2)' : '#e5e7eb'}` }}>
-                <summary style={{ cursor: 'pointer', padding: '1.5rem 0', fontSize: '1.7rem', fontWeight: 600, listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span dangerouslySetInnerHTML={{ __html: stripEditorDivs(item.title) }} />
-                  <span style={{ marginLeft: '1rem', fontSize: '1.2rem' }}>▾</span>
+              <details key={item.id} className="block-accordion__item">
+                <summary className="block-accordion__title brand--linkColor">
+                  <div className="fr-view rise-tiptap" dangerouslySetInnerHTML={{ __html: item.title }} />
+                  <span className="block-accordion__icon">▾</span>
                 </summary>
-                <div style={{ padding: '0 0 1.5rem', fontSize: '1.7rem', lineHeight: 1.7 }}
-                  dangerouslySetInnerHTML={{ __html: stripEditorDivs(item.bodyHtml) }} />
+                <div className="block-accordion__body brand--linkColor">
+                  <div className="fr-view rise-tiptap" dangerouslySetInnerHTML={{ __html: item.bodyHtml }} />
+                </div>
               </details>
             ))}
           </div>
@@ -292,19 +338,6 @@ function RiseBlock({ block, c, t }: { block: Block; c: C; t: BlockTheme }) {
     default:
       return <NativeBlock block={block} c={c} t={t} />
   }
-}
-
-// ── Strip Rise's editor wrapper divs ─────────────────────────────────────────
-// Removes <div data-editor-id="..."> wrappers but preserves all inner HTML
-// including inline styles like font-size, color, text-align
-
-function stripEditorDivs(html: string): string {
-  if (!html) return ''
-  return html
-    .replace(/<div[^>]*data-editor-id="[^"]*"[^>]*>/gi, '')
-    .replace(/<div[^>]*class="rise-table-wrap"[^>]*>/gi, '<div class="rise-table-wrap" style="overflow-x:auto">')
-    .replace(/<\/div>(?=\s*$)/gi, '')  // only remove trailing close divs
-    .trim()
 }
 
 // ── Native block renderer ─────────────────────────────────────────────────────
@@ -342,13 +375,22 @@ function NativeBlock({ block, c, t, courseId }: { block: Block; c: C; t: BlockTh
       const vidUrl = c.publicUrl || c.src
       const posterUrl = c.posterPublicUrl || c.poster
       if (!vidUrl) return <div className="h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-sm">No video</div>
+      if (c.type === 'youtube' || c.type === 'vimeo') {
+        const src = c.type === 'youtube' ? String(vidUrl).replace('watch?v=', 'embed/') : String(vidUrl).replace('vimeo.com/', 'player.vimeo.com/video/')
+        return <div className="aspect-video rounded-xl overflow-hidden"><iframe src={src} className="w-full h-full" allowFullScreen /></div>
+      }
       return <video src={String(vidUrl)} poster={posterUrl ? String(posterUrl) : undefined} controls className="w-full rounded-xl block" />
     }
+
+    case 'audio':
+      if (!c.publicUrl) return null
+      return <audio src={String(c.publicUrl)} controls className="w-full" />
 
     case 'quote':
       return (
         <blockquote className="border-l-4 pl-5 py-1" style={{ borderColor: t.accent }}>
           <div dangerouslySetInnerHTML={{ __html: String(c.text || '') }} />
+          {c.author && <footer className="text-sm mt-2 not-italic" style={{ color: `${t.text}60` }}>— {String(c.author)}</footer>}
         </blockquote>
       )
 
@@ -403,6 +445,13 @@ function NativeBlock({ block, c, t, courseId }: { block: Block; c: C; t: BlockTh
       )
     }
 
+    case 'statement':
+      return (
+        <div className="text-center py-8 px-6 rounded-xl" style={{ backgroundColor: `${t.primary}10` }}>
+          <div dangerouslySetInnerHTML={{ __html: String(c.text || '') }} />
+        </div>
+      )
+
     case 'columns': {
       const cols = (c.columns as Array<{ widthPct: number; blocks: Array<{ type: string; content: C; settings: C }> }>) || []
       return (
@@ -425,13 +474,6 @@ function NativeBlock({ block, c, t, courseId }: { block: Block; c: C; t: BlockTh
       return (
         <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center">
           <p className="text-gray-500 text-sm">Quiz — configure in editor</p>
-        </div>
-      )
-
-    case 'statement':
-      return (
-        <div className="text-center py-8 px-6 rounded-xl" style={{ backgroundColor: `${t.primary}10` }}>
-          <div dangerouslySetInnerHTML={{ __html: String(c.text || '') }} />
         </div>
       )
 
